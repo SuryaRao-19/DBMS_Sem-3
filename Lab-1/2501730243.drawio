@@ -1,0 +1,107 @@
+<mxfile host="app.diagrams.net" modified="2026-08-12T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram name="Library Hierarchy" id="lib-hierarchy-1">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- LIBRARY -->
+        <mxCell id="lib" value="LIBRARY&#10;Library ID, Name, Address" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="700" y="40" width="280" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- STAFF -->
+        <mxCell id="s1" value="Staff (S1)&#10;StaffID=S1, Name,&#10;Roll=Librarian" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="420" y="220" width="240" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="Staff (S2)&#10;StaffID=S2, Name,&#10;Roll=Clerk" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="220" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- MEMBERS -->
+        <mxCell id="m1" value="MEMBER (M1)&#10;MemberID=M1&#10;Name=Aarav" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="200" y="400" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" value="MEMBER (M2)&#10;MemberID=M2&#10;Name=Aanya" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="500" y="400" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" value="MEMBER (M3)&#10;MemberID=M3&#10;Name=Anvi" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="920" y="400" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="m4" value="MEMBER (M4)&#10;MemberID=M4&#10;Name=Khushi" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="400" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- LOANS / RESERVATIONS -->
+        <mxCell id="l1" value="LOAN (L1)&#10;LoanID=L1&#10;BookID=B1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="100" y="580" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" value="RESERVATION (R1)&#10;ResID=R1&#10;BookID=B1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="300" y="580" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l2" value="LOAN (L2)&#10;LoanID=L2&#10;BookID=B2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="480" y="580" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="RESERVATION (R2)&#10;ResID=R2&#10;BookID=B2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="680" y="580" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l3" value="LOAN (L3)&#10;LoanID=L3&#10;BookID=B3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="900" y="580" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" value="RESERVATION (R4)&#10;ResID=R4&#10;BookID=B4" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="580" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="r3" value="RESERVATION (R3)&#10;ResID=R3&#10;BookID=B3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#2F2F2F;fontColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="580" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="lib" target="s1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="lib" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="s1" target="m1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="s1" target="m2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="s2" target="m3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="s2" target="m4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="m1" target="l1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="m1" target="r1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="m2" target="l2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="m2" target="r2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="m3" target="l3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="m3" target="r4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FFFFFF;endArrow=block;" edge="1" parent="1" source="m4" target="r3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
