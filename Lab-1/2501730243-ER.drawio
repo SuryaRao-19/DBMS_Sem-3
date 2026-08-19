@@ -35,7 +35,7 @@
         <mxCell id="bUNF0KHz1Xm2H9f7JNtf-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;gradientColor=#b3b3b3;" value="&lt;font face=&quot;Times New Roman&quot;&gt;LIBRARY&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font face=&quot;Times New Roman&quot;&gt;Library ID, Name , Address&lt;/font&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="60" width="240" x="-1000" y="100" as="geometry" />
         </mxCell>
-        <mxCell id="bUNF0KHz1Xm2H9f7JNtf-12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;gradientColor=#b3b3b3;" value="MEMBER (M1)&lt;div&gt;MemberID=M1&lt;/div&gt;&lt;div&gt;Name=Aarav&lt;/div&gt;" vertex="1">
+        <mxCell id="bUNF0KHz1Xm2H9f7JNtf-12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;gradientColor=#b3b3b3;" value="MEMBER (M1)&lt;div&gt;MemberID=M1&lt;/div&gt;&lt;div&gt;Name=Arnav&lt;/div&gt;" vertex="1">
           <mxGeometry height="60" width="120" x="-1443" y="450" as="geometry" />
         </mxCell>
         <mxCell id="bUNF0KHz1Xm2H9f7JNtf-36" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;gradientColor=#b3b3b3;" value="LOAN(L1)&lt;div&gt;LoanID=L1&lt;/div&gt;&lt;div&gt;BookID=B1&lt;/div&gt;" vertex="1">
@@ -132,7 +132,7 @@
         <mxCell id="HAhVBhwau4xv5jEv6wDx-30" connectable="0" parent="HAhVBhwau4xv5jEv6wDx-29" style="resizable=0;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;" value="1" vertex="1">
           <mxGeometry relative="1" x="1" as="geometry" />
         </mxCell>
-        <mxCell id="HAhVBhwau4xv5jEv6wDx-31" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;gradientColor=#b3b3b3;" value="MEMBER (M2)&lt;div&gt;MemberID=M2&lt;/div&gt;&lt;div&gt;Name=Ananya&lt;/div&gt;" vertex="1">
+        <mxCell id="HAhVBhwau4xv5jEv6wDx-31" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;gradientColor=#b3b3b3;" value="MEMBER (M2)&lt;div&gt;MemberID=M2&lt;/div&gt;&lt;div&gt;Name=Anvi&lt;/div&gt;" vertex="1">
           <mxGeometry height="60" width="120" x="-780" y="453" as="geometry" />
         </mxCell>
         <mxCell id="HAhVBhwau4xv5jEv6wDx-32" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;gradientColor=#b3b3b3;" value="LOAN(L2)&lt;div&gt;LoanID=L2&lt;/div&gt;&lt;div&gt;BookID=B2&lt;/div&gt;" vertex="1">
