@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Book Charging Slot — {{ point.point_code }} — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <a href="{{ url_for('customer.stations') }}" style="font-size:0.85rem; color:var(--text-dim); text-decoration:none;">&larr; Back to Stations</a>
+  <h1 style="margin:0.35rem 0 0 0;">Reserve Charging Dispenser</h1>
+  <p class="page-subtitle" style="margin:0;">
+    Lock in your charging time slot at {{ station.station_name }}.
+  </p>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:1.75rem;">
+  <!-- Left Column: Reservation Form -->
+  <div class="card">
+    <h3 style="margin:0 0 1.25rem 0; font-size:1.15rem;">Reservation Details</h3>
+
+    <form method="POST" action="{{ url_for('customer.book_slot', point_id=point.point_id) }}" id="bookingForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group">
+        <label class="form-label" for="vehicle_id">Select Vehicle</label>
+        <select id="vehicle_id" name="vehicle_id" class="form-control" required onchange="recalcEstimates()">
+          {% for v in vehicles %}
+            <option value="{{ v.vehicle_id }}" data-capacity="{{ v.battery_capacity_kwh }}" {% if v.vehicle_id == default_vid %}selected{% endif %}>
+              {{ v.make }} {{ v.model }} ({{ v.registration_no }}) &bull; {{ v.battery_capacity_kwh }} kWh
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="start_time">Reservation Start Time</label>
+          <input type="datetime-local" id="start_time" name="start_time" class="form-control" value="{{ default_start }}" required onchange="recalcEstimates()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="duration_minutes">Charging Duration</label>
+          <select id="duration_minutes" name="duration_minutes" class="form-control" onchange="recalcEstimates()">
+            <option value="30">30 Minutes</option>
+            <option value="45">45 Minutes</option>
+            <option value="60" selected>60 Minutes (1 Hour)</option>
+            <option value="90">90 Minutes (1.5 Hours)</option>
+            <option value="120">120 Minutes (2 Hours)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Live Estimation Summary Card -->
+      <div style="padding:1rem; border-radius:8px; background:rgba(6,182,212,0.06); border:1px solid rgba(6,182,212,0.25); margin:1.25rem 0;">
+        <div style="font-size:0.8rem; font-weight:700; color:var(--accent-cyan); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.5rem;">
+          Estimated Energy &amp; Cost
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem; font-size:0.88rem;">
+          <span>Dispenser Power:</span>
+          <strong>{{ point.power_rating_kw }} kW</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem; font-size:0.88rem;">
+          <span>Tariff Rate:</span>
+          <strong>₹{{ "%.2f"|format(point.tariff_per_kwh) }} / kWh</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem; font-size:0.88rem;">
+          <span>Estimated Energy Delivery:</span>
+          <strong id="estEnergy">~22.00 kWh</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding-top:0.5rem; border-top:1px solid rgba(6,182,212,0.2); font-size:1.05rem;">
+          <strong>Estimated Total:</strong>
+          <strong style="color:#10B981;" id="estCost">~₹396.00</strong>
+        </div>
+      </div>
+
+      <div style="margin-bottom:1.25rem; font-size:0.8rem; color:var(--text-dim); line-height:1.4;">
+        ⚠️ <em>Academic Demo Notice:</em> Reservations are saved in the local MySQL database with concurrency serialization locks. No actual hardware charging stall will be held.
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">
+        Confirm Slot Reservation &rarr;
+      </button>
+    </form>
+  </div>
+
+  <!-- Right Column: Dispenser & Station Summary -->
+  <div class="card" style="align-self:start;">
+    <h3 style="margin:0 0 1rem 0; font-size:1.15rem;">Dispenser Placard</h3>
+
+    <div style="margin-bottom:1rem;">
+      <span class="badge badge-success">{{ point.point_status }}</span>
+      <span class="badge badge-secondary">{{ point.connector_type }}</span>
+      <h4 style="margin:0.5rem 0 0.2rem 0; font-size:1.2rem;">{{ point.point_code }}</h4>
+      <div style="font-size:0.85rem; color:var(--text-dim);">
+        {{ station.station_name }} &bull; {{ station.city }}
+      </div>
+    </div>
+
+    <div style="font-size:0.85rem; color:var(--text-dim); line-height:1.5; padding:0.85rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); margin-bottom:1rem;">
+      📍 <strong>Address:</strong> {{ station.address }}<br>
+      ⏰ <strong>Operating Hours:</strong> {{ station.opening_time or '24/7' }} - {{ station.closing_time or '' }}<br>
+      🏢 <strong>Operator:</strong> {{ station.operator_name or 'Tata Power EZ Charge' }}
+    </div>
+
+    <div style="font-size:0.8rem; color:var(--text-dim);">
+      Your reservation includes an encrypted check-in QR code available immediately on your Bookings dashboard after confirmation.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const pointPower = {{ point.power_rating_kw or 22.0 }};
+const pointTariff = {{ point.tariff_per_kwh or 18.0 }};
+
+function recalcEstimates() {
+  const durSelect = document.getElementById('duration_minutes');
+  const durHours = parseInt(durSelect.value, 10) / 60.0;
+
+  const vehSelect = document.getElementById('vehicle_id');
+  const selectedOpt = vehSelect.options[vehSelect.selectedIndex];
+  const battCap = selectedOpt ? parseFloat(selectedOpt.getAttribute('data-capacity') || 50.0) : 50.0;
+
+  const estKwh = Math.min(pointPower * durHours, battCap * 1.15);
+  const estCost = estKwh * pointTariff;
+
+  document.getElementById('estEnergy').textContent = `~${estKwh.toFixed(2)} kWh`;
+  document.getElementById('estCost').textContent = `~₹${estCost.toFixed(2)}`;
+}
+
+document.addEventListener('DOMContentLoaded', recalcEstimates);
+</script>
+{% endblock %}
+

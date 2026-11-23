@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}Manage Stations - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Charging Station Infrastructure &amp; Verification</h1>
+    <div class="page-subtitle">Configure real NCR stations, import verified CSV batches, and approve hubs before publishing</div>
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    <form method="POST" action="{{ url_for('admin.sync_ocm') }}" style="display:inline;" onsubmit="return confirm('Fetch and synchronize genuine Open Charge Map POI records for Delhi NCR?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="city" value="Delhi NCR">
+      <input type="hidden" name="max_results" value="25">
+      <button type="submit" class="btn btn-secondary" title="Fetch live POIs from Open Charge Map API v3">
+        🌐 Sync Open Charge Map
+      </button>
+    </form>
+    <button class="btn btn-secondary" onclick="openModal('importCsvModal')">📥 Import CSV Batch</button>
+    <button class="btn btn-primary" onclick="openModal('addStationModal')">+ Add New Station</button>
+  </div>
+</div>
+
+{% if pending_stations %}
+<!-- Pending Admin Approval Queue -->
+<div class="card" style="margin-bottom:1.5rem; border-color: rgba(245,158,11,0.45); background: rgba(245,158,11,0.06);">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+    <h3 style="margin:0;">⏳ Stations Awaiting Verification Approval ({{ pending_stations|length }})</h3>
+    <span class="badge badge-warning">Hidden From Public Directory Until Approved</span>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Station</th>
+          <th>Location &amp; GPS</th>
+          <th>Operator &amp; Source</th>
+          <th>Status</th>
+          <th>Review Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ps in pending_stations %}
+          <tr>
+            <td><strong>{{ ps.station_name }}</strong></td>
+            <td style="font-size:0.82rem;">{{ ps.address }}, {{ ps.city }} ({{ ps.postal_code or '—' }})<br><span class="text-dim">{{ ps.latitude }}, {{ ps.longitude }}</span></td>
+            <td style="font-size:0.82rem;">{{ ps.operator_name }}<br>{% if ps.source_url %}<a href="{{ ps.source_url }}" target="_blank" rel="noopener noreferrer">Source &nearr;</a>{% endif %}</td>
+            <td><span class="badge badge-warning">{{ ps.approval_status }}</span></td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.review_station', station_id=ps.station_id) }}" style="display:flex; gap:0.4rem;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" name="decision" value="APPROVED" class="btn btn-sm btn-primary">Approve &amp; Publish</button>
+                <button type="submit" name="decision" value="REJECTED" class="btn btn-sm btn-danger">Reject</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Filter Bar -->
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.5rem;">
+  <form method="GET" action="{{ url_for('admin.stations') }}" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 180px;">
+      <label class="form-label" style="font-size: 0.75rem;">FILTER BY CITY</label>
+      <input type="text" name="city" class="form-control" placeholder="All Cities" value="{{ request.args.get('city', '') }}">
+    </div>
+    <div style="flex: 1; min-width: 180px;">
+      <label class="form-label" style="font-size: 0.75rem;">OPERATIONAL STATUS</label>
+      <select name="status" class="form-control">
+        <option value="">All Statuses</option>
+        <option value="ACTIVE" {% if request.args.get('status') == 'ACTIVE' %}selected{% endif %}>Active</option>
+        <option value="MAINTENANCE" {% if request.args.get('status') == 'MAINTENANCE' %}selected{% endif %}>Maintenance</option>
+        <option value="INACTIVE" {% if request.args.get('status') == 'INACTIVE' %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    <a href="{{ url_for('admin.stations') }}" class="btn btn-secondary btn-sm">Reset</a>
+  </form>
+</div>
+
+<!-- Stations Table -->
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Station Name</th>
+        <th>City</th>
+        <th>Address</th>
+        <th>Hours</th>
+        <th>Dispensers</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in stations %}
+        <tr>
+          <td>
+            <div style="font-weight: 700; font-size: 1rem;">{{ s.station_name }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">
+              ID: #{{ s.station_id }} &bull; {{ s.operator_name or 'Tata Power EZ Charge' }}
+              &bull; <span class="integrity-pill integrity-{{ (s.verification_status or 'DEMO').lower() }}">{{ s.verification_status or 'DEMO' }}</span>
+              {% if s.approval_status != 'APPROVED' %}
+                &bull; <span class="badge badge-warning">{{ s.approval_status }}</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <span style="font-weight: 600; color: var(--accent-cyan);">{{ s.city }}</span>
+            {% if s.postal_code %}<div style="font-size:0.72rem; color:var(--text-dim);">PIN: {{ s.postal_code }}</div>{% endif %}
+          </td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">{{ s.address }}</td>
+          <td style="font-size: 0.85rem;">{{ s.opening_time }} - {{ s.closing_time }}</td>
+          <td>
+            <span style="font-weight: 700;">{{ s.total_points }} Total</span>
+            <div style="font-size: 0.75rem; color: #34d399;">{{ s.available_points }} Available</div>
+          </td>
+          <td>
+            <span class="badge badge-{{ s.station_status.lower() }}">{{ s.station_status }}</span>
+          </td>
+          <td>
+            <button class="btn btn-secondary btn-sm"
+                    data-id="{{ s.station_id }}"
+                    data-name="{{ s.station_name }}"
+                    data-city="{{ s.city }}"
+                    data-address="{{ s.address }}"
+                    data-opening="{{ s.opening_time }}"
+                    data-closing="{{ s.closing_time }}"
+                    data-status="{{ s.station_status }}"
+                    data-owner-id="{{ s.owner_user_id or '' }}"
+                    onclick="openEditStationModal(this)">
+              Edit
+            </button>
+          </td>
+        </tr>
+
+      {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--text-dim);">No stations found matching criteria.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Verification Status Transitions & Station Identification QR Registry -->
+<div class="card mt-4 mb-4">
+  <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+    <div>
+      <h2 style="font-size:1.15rem; margin:0;">Station Verification Governance &amp; Identification QR Codes</h2>
+      <p class="text-muted" style="font-size:0.84rem; margin:0.25rem 0 0;">
+        Manage coordinate verification state and opaque Station Identification QR placards (static station links &mdash; distinct from Razorpay dynamic payment QRs).
+      </p>
+    </div>
+    <span class="integrity-pill integrity-verified">{{ stations|length }} Station Record(s)</span>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Station &amp; Coordinates</th>
+          <th>Verification Transition</th>
+          <th>QR Status &amp; Scan Telemetry</th>
+          <th>Download / Print / Token Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stations %}
+          {% set qrow = station_qrs.get(s.station_id) if station_qrs else none %}
+          <tr>
+            <td>
+              <strong>{{ s.station_name }}</strong>
+              <div class="text-muted" style="font-size:0.78rem;">
+                {{ s.city }} &bull;
+                {% if s.latitude is not none and s.longitude is not none %}
+                  GPS: {{ "%.4f"|format(s.latitude) }}, {{ "%.4f"|format(s.longitude) }}
+                {% else %}
+                  <span style="color:var(--color-warning); font-weight:600;">Location verification pending.</span>
+                {% endif %}
+              </div>
+              <div style="font-size:0.74rem; color:var(--color-text-secondary);">
+                Slug: <code>{{ s.station_slug or ('station-' ~ s.station_id) }}</code> &bull;
+                Origin: <code>{{ s.record_origin or 'VERIFIED_PUBLIC_SOURCE' }}</code>
+              </div>
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.verify_station_route', station_id=s.station_id) }}" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="verification_status" class="form-control" style="min-width:165px; padding:0.35rem 0.5rem; font-size:0.8rem;">
+                  {% for vst in valid_verification_statuses %}
+                    <option value="{{ vst }}" {% if (s.verification_status or 'VERIFIED') == vst %}selected{% endif %}>{{ vst }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
+              </form>
+            </td>
+            <td style="font-size:0.8rem;">
+              {% if qrow %}
+                <div>
+                  <span class="badge {% if qrow.qr_status == 'ACTIVE' %}bg-success{% else %}bg-danger{% endif %}">{{ qrow.qr_status }}</span>
+                  <strong style="margin-left:0.35rem;">{{ qrow.scan_count }} scan(s)</strong>
+                </div>
+                <div class="text-muted" style="font-size:0.74rem; margin-top:0.2rem;">
+                  Token: <code>{{ qrow.qr_token[:12] }}&hellip;</code>
+                  {% if qrow.last_scanned_at %}<br>Last scan: {{ qrow.last_scanned_at }}{% endif %}
+                </div>
+              {% else %}
+                <span class="text-muted">Auto-generated on print / view</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
+                <a href="{{ url_for('admin.download_qr_png', station_id=s.station_id) }}" class="btn btn-secondary btn-sm" title="Download high-DPI PNG">PNG</a>
+                <a href="{{ url_for('admin.download_qr_svg', station_id=s.station_id) }}" class="btn btn-secondary btn-sm" title="Download vector SVG">SVG</a>
+                <a href="{{ url_for('admin.print_station_qr', station_id=s.station_id) }}" target="_blank" class="btn btn-primary btn-sm" title="Print Placard">Print</a>
+                <form method="POST" action="{{ url_for('admin.regenerate_qr_route', station_id=s.station_id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-secondary btn-sm" title="Rotate opaque token">Regenerate</button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.revoke_qr_route', station_id=s.station_id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Revoke active Station QR">Revoke</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" style="text-align:center;color:var(--color-text-secondary);">No stations available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Station Modal -->
+<div id="addStationModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Add Charging Station</h3>
+      <button class="modal-close" onclick="closeModal('addStationModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin.stations') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Station Name</label>
+        <input type="text" name="station_name" class="form-control" placeholder="e.g. South Extension EV Hub" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input type="text" id="addStationCityInput" name="city" class="form-control" placeholder="e.g. New Delhi" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Operational Status</label>
+          <select name="station_status" class="form-control">
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="MAINTENANCE">MAINTENANCE</option>
+            <option value="INACTIVE">INACTIVE</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Indian PIN Code Lookup Helper (Optional)</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="text" id="addStationPinInput" maxlength="6" class="form-control" placeholder="e.g. 110001">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="window.EVGeoWidget && window.EVGeoWidget.lookupIndianPin('addStationPinInput', 'addStationPinResult', 'addStationCityInput')">Verify PIN</button>
+        </div>
+        <div id="addStationPinResult" style="margin-top:0.45rem;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Address</label>
+        <input type="text" name="address" class="form-control" placeholder="e.g. Ring Road, Block B" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Opening Time</label>
+          <input type="time" name="opening_time" class="form-control" value="06:00" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Closing Time</label>
+          <input type="time" name="closing_time" class="form-control" value="23:00" required>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addStationModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Station</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Station Modal -->
+<div id="editStationModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit Station Details</h3>
+      <button class="modal-close" onclick="closeModal('editStationModal')">&times;</button>
+    </div>
+    <form id="editStationForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Station Name</label>
+        <input type="text" id="edit_station_name" name="station_name" class="form-control" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input type="text" id="edit_city" name="city" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Operational Status</label>
+          <select id="edit_station_status" name="station_status" class="form-control">
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="MAINTENANCE">MAINTENANCE</option>
+            <option value="INACTIVE">INACTIVE</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Address</label>
+        <input type="text" id="edit_address" name="address" class="form-control" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Opening Time</label>
+          <input type="time" id="edit_opening_time" name="opening_time" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Closing Time</label>
+          <input type="time" id="edit_closing_time" name="closing_time" class="form-control" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Assigned Station Partner (Owner)</label>
+        <select id="edit_owner_user_id" name="owner_user_id" class="form-control">
+          <option value="">No Partner Assigned (Platform Managed)</option>
+          {% for o in owners %}
+            <option value="{{ o.user_id }}">{{ o.full_name }} ({{ o.email }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editStationModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openEditStationModal(btn) {
+    const d = btn.dataset;
+    document.getElementById('editStationForm').action = '/admin/stations/' + d.id + '/edit';
+    document.getElementById('edit_station_name').value = d.name;
+    document.getElementById('edit_city').value = d.city;
+    document.getElementById('edit_address').value = d.address;
+    document.getElementById('edit_opening_time').value = d.opening ? d.opening.substring(0, 5) : '06:00';
+    document.getElementById('edit_closing_time').value = d.closing ? d.closing.substring(0, 5) : '23:00';
+    document.getElementById('edit_station_status').value = d.status;
+    document.getElementById('edit_owner_user_id').value = d.ownerId || '';
+    openModal('editStationModal');
+  }
+</script>
+
+<!-- CSV Import Modal -->
+<div id="importCsvModal" class="modal-overlay">
+  <div class="modal-content" style="max-width:640px;">
+    <div class="modal-header">
+      <h3>Import Charging Stations (CSV)</h3>
+      <button class="modal-close" onclick="closeModal('importCsvModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin.import_stations') }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p class="text-muted" style="font-size:0.82rem; margin-bottom:0.75rem;">
+        Required headers: <code>station_name,address,city,state,postal_code,latitude,longitude,operator_name,connector_types,charger_capacity_kw,source_url,facilities</code>.
+        Imported records enter <strong>PENDING_APPROVAL</strong> until reviewed by an Admin.
+      </p>
+      <div class="form-group">
+        <label class="form-label" for="csv_file_input">Upload .csv File (Optional)</label>
+        <input type="file" id="csv_file_input" name="csv_file" accept=".csv,text/csv" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="csv_text_input">Or Paste CSV Rows Directly</label>
+        <textarea id="csv_text_input" name="csv_text" class="form-control" rows="5" placeholder="station_name,address,city,state,postal_code,latitude,longitude,operator_name,connector_types,charger_capacity_kw,source_url,facilities"></textarea>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('importCsvModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Validate &amp; Import</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/ev_geo_weather.js') }}"></script>
+{% endblock %}
+

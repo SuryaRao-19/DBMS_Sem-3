@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Notifications — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">Notifications &amp; Activity Alerts</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Stay updated on reservation confirmations, charging completion, and partner application progress.
+    </p>
+  </div>
+  {% if notifications %}
+    <form method="POST" action="{{ url_for('customer.notifications_mark_all_read') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-secondary btn-sm">
+        Mark All as Read
+      </button>
+    </form>
+  {% endif %}
+</div>
+
+{% if notifications %}
+  <div style="display:flex; flex-direction:column; gap:0.85rem;">
+    {% for n in notifications %}
+      <div class="card" style="padding:1.15rem; border-left:4px solid {% if not n.is_read %}var(--color-brand-secondary){% else %}var(--color-border){% endif %};">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;">
+          <div>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
+              <span class="badge badge-secondary" style="font-size:0.7rem;">{{ n.category or 'SYSTEM' }}</span>
+              <strong style="font-size:0.95rem;">{{ n.title }}</strong>
+              {% if not n.is_read %}
+                <span class="badge badge-success" style="font-size:0.65rem;">NEW</span>
+              {% endif %}
+            </div>
+            <p style="margin:0 0 0.5rem 0; font-size:0.88rem; color:var(--text-dim); line-height:1.4;">
+              {{ n.message }}
+            </p>
+            <div style="font-size:0.75rem; color:var(--text-dim);">
+              {{ n.created_at }}
+            </div>
+          </div>
+
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-shrink:0;">
+            {% if n.link_url %}
+              <a href="{{ n.link_url }}" class="btn btn-xs btn-primary">
+                View &rarr;
+              </a>
+            {% endif %}
+            {% if not n.is_read %}
+              <form method="POST" action="{{ url_for('customer.notification_read', notification_id=n.notification_id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-xs btn-secondary" title="Mark read">
+                  ✓
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">🔔</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Notifications Yet</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto;">
+      Important updates about your charging sessions and reservations will appear here.
+    </p>
+  </div>
+{% endif %}
+{% endblock %}
+

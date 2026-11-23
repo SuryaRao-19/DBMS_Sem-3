@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}{{ station.station_name }} — EZ Charge Network Portal{% endblock %}
+{% block breadcrumb_section %}Charging Network{% endblock %}
+{% block breadcrumb_current %}{{ station.station_name }}{% endblock %}
+
+{% block content %}
+{% set is_coord_verified = (station.latitude is not none and station.longitude is not none and station.verification_status != 'PENDING_VERIFICATION') %}
+
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+  <div>
+    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.45rem;">
+      <span class="integrity-pill integrity-{{ (station.verification_status or 'verified').lower() }}">{{ station.verification_status or 'VERIFIED' }}</span>
+      <span class="station-city-badge">{{ station.city }}</span>
+      <span class="integrity-pill {{ station.provenance_pill_class or 'integrity-demo' }}">{{ station.provenance_label or station.record_origin or 'VERIFIED_PUBLIC_SOURCE' }}</span>
+    </div>
+    <h1 class="page-title">{{ station.station_name }}</h1>
+    <p class="page-subtitle">
+      {{ station.address }}{% if station.postal_code %} &mdash; {{ station.postal_code }}{% endif %}, {{ station.state or 'India' }}
+    </p>
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    <a href="{{ url_for('public.browse_stations') }}" class="btn btn-secondary btn-sm">&larr; All Stations</a>
+    {% if is_coord_verified and station.maps_url %}
+      <a href="{{ station.maps_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in Google Maps &nearr;</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if qr_verified %}
+  <div class="alert alert-success mb-4">
+    <i class="fa-solid fa-qrcode"></i>
+    <strong>Station Identification QR Verified:</strong> You arrived via official portal placard token <code>{{ station_qr.qr_token if station_qr else '' }}</code>.
+  </div>
+{% endif %}
+
+<!-- Station Map + Identification QR + Provenance Grid -->
+<div class="grid-cols-2 mb-4">
+  <div class="card">
+    <h2 style="font-size:1.15rem; margin-bottom:0.75rem;">Location &amp; Verification Status</h2>
+    {% if is_coord_verified %}
+      <div id="detailMapStatus" class="text-muted" style="font-size:0.8rem; margin-bottom:0.5rem;">Loading verified station pin...</div>
+      <div id="detailMap"
+           class="ev-map-container"
+           style="height:260px;"
+           data-ev-map
+           data-maps-key="{{ google_maps_api_key }}"
+           data-stations-el="detailStationJson"
+           data-status-target="detailMapStatus"></div>
+      <script type="application/json" id="detailStationJson">{{ [station]|tojson }}</script>
+      <p class="text-muted" style="font-size:0.8rem; margin-top:0.65rem;">
+        Verified Coordinates: <code>{{ "%.5f"|format(station.latitude) }}, {{ "%.5f"|format(station.longitude) }}</code> &bull;
+        Hours: {{ station.opening_time or '00:00' }} &ndash; {{ station.closing_time or '23:59' }}
+      </p>
+    {% else %}
+      <div style="padding:2rem; border:1px dashed rgba(245,158,11,0.5); border-radius:var(--radius-md); background:rgba(245,158,11,0.08); text-align:center;">
+        <div style="font-size:2rem; color:#F59E0B; margin-bottom:0.5rem;"><i class="fa-solid fa-location-crosshairs"></i></div>
+        <h3 style="margin-bottom:0.35rem;">Location verification pending.</h3>
+        <p class="text-muted" style="font-size:0.88rem; margin:0;">
+          This press-release candidate location has been recorded with <code>latitude=NULL</code> / <code>longitude=NULL</code> and is intentionally excluded from interactive map pins until an administrator verifies its exact geographic coordinates.
+        </p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:1.15rem; margin-bottom:0.75rem;">Station Identification QR &amp; Data Provenance</h2>
+    <div style="display:flex; gap:1.25rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
+      {% if station_qr %}
+        <div class="qr-preview-box" style="background:#FFFFFF; padding:0.65rem; border-radius:10px; border:1px solid var(--border-color); width:124px; height:124px; display:flex; align-items:center; justify-content:center;">
+          {% if station_qr.qr_status == 'ACTIVE' %}
+            <a href="{{ url_for('public.scan_station_qr', token=station_qr.qr_token) }}" title="Test Scan Station Identification QR" style="display:block; line-height:0;">
+              <img src="{{ url_for('public.station_qr_image', token=station_qr.qr_token) }}"
+                   alt="Station QR for {{ station.station_name }}" style="width:104px; height:104px; display:block;">
+            </a>
+          {% else %}
+            <span class="badge bg-danger">{{ station_qr.qr_status }}</span>
+          {% endif %}
+        </div>
+      {% endif %}
+      <div style="flex:1; min-width:200px; font-size:0.84rem;">
+        <div style="margin-bottom:0.35rem;"><strong>QR Purpose:</strong> Station Identification only (not a payment QR)</div>
+        {% if station_qr %}
+          <div class="text-muted">Status: <strong>{{ station_qr.qr_status }}</strong> &bull; Total Scans: <strong>{{ station_qr.scan_count }}</strong></div>
+          <div class="text-muted">Scan Route: <code>/qr/station/{{ station_qr.qr_token }}</code></div>
+        {% endif %}
+        {% if station.station_slug %}
+          <div class="text-muted">Canonical Slug: <a href="{{ url_for('public.station_by_slug', slug=station.station_slug) }}"><code>/station/{{ station.station_slug }}</code></a></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border-color); padding-top:0.85rem; font-size:0.82rem; display:grid; grid-template-columns:1fr 1fr; gap:0.45rem 1rem;">
+      <div><strong>Source Type:</strong> {{ station.source_type or 'PUBLIC_REFERENCE' }}</div>
+      <div><strong>Confidence:</strong> {{ station.confidence_level or 'MEDIUM' }}</div>
+      <div><strong>Source Name:</strong> {{ station.source_name or 'Public Reference' }}</div>
+      <div><strong>Last Verified:</strong> {{ station.last_verified_at or 'Recorded in Seed' }}</div>
+      {% if station.external_source_id %}
+        <div><strong>External ID:</strong> <code>{{ station.external_source_id }}</code></div>
+      {% endif %}
+      {% if station.license_info %}
+        <div><strong>License:</strong> {{ station.license_info }}</div>
+      {% endif %}
+      {% if station.imported_at or station.last_synced_at %}
+        <div><strong>Imported:</strong> {{ station.imported_at or '—' }}</div>
+        <div><strong>Last Synced:</strong> {{ station.last_synced_at or '—' }}</div>
+      {% endif %}
+      {% if station.provenance_category == 'B_THIRD_PARTY_API' %}
+        <div style="grid-column:1 / -1; padding:0.45rem 0.65rem; border-radius:6px; background:rgba(245,158,11,0.12); color:#fbbf24;">
+          <strong>Availability Disclaimer:</strong> Third-party public directory record &mdash; live real-time charger port occupancy is not supplied by this API.
+        </div>
+      {% endif %}
+      {% if station.source_url %}
+        <div style="grid-column:1 / -1;">
+          <strong>Reference URL:</strong> <a href="{{ station.source_url }}" target="_blank" rel="noopener noreferrer">{{ station.source_url }} &nearr;</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Dispensers List -->
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+  <h2 style="margin:0;">Available Charging Dispensers</h2>
+  <span class="integrity-pill integrity-demo">DEMO BAY STATE &bull; Availability not connected &mdash; demonstration data.</span>
+</div>
+
+<div class="grid-cols-3">
+  {% for point in (station.points or []) %}
+    <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+          <strong style="font-size:1.05rem;">{{ point.point_code }}</strong>
+          <span class="badge {% if point.point_status == 'AVAILABLE' %}bg-success{% else %}bg-warning{% endif %}">{{ point.point_status }}</span>
+        </div>
+        <div class="text-muted" style="font-size:0.86rem; margin-bottom:0.65rem;">
+          Connector: <strong>{{ point.connector_type }}</strong> &bull; Max Power: <strong>{{ point.max_power_kw }} kW</strong>
+        </div>
+        <div style="margin-bottom:1rem;">
+          <span class="text-muted" style="font-size:0.82rem;">Demo Tariff Rate:</span>
+          <span class="font-semibold" style="color: var(--accent-emerald);">₹{{ "%.2f"|format(point.tariff_per_kwh) }} / kWh</span>
+        </div>
+      </div>
+
+      <div>
+        {% if point.point_status == 'AVAILABLE' and station.station_status == 'ACTIVE' %}
+          {% if session.get('role') in ('CUSTOMER', 'OWNER') %}
+            <a href="{{ url_for('customer.book_slot', point_id=point.point_id) }}" class="btn btn-primary btn-block">
+              Reserve This Dispenser &rarr;
+            </a>
+          {% elif session.get('role') == 'ADMIN' %}
+            <button class="btn btn-secondary btn-block" disabled title="Admin viewing mode">
+              Admin Mode (Active Dispenser)
+            </button>
+          {% else %}
+            <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-block">
+              Log In to Reserve &rarr;
+            </a>
+          {% endif %}
+        {% else %}
+          <button class="btn btn-secondary btn-block" disabled style="opacity: 0.5; cursor: not-allowed;">
+            Currently Unavailable
+          </button>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="card text-center" style="grid-column: 1 / -1; padding: 2rem;">
+      <p class="text-muted">No charging points configured for this demo facility yet.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/ev_geo_weather.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ev_map.js') }}"></script>
+{% endblock %}

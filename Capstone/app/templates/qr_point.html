@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Dispenser {{ point.point_code }} — Charging Point QR{% endblock %}
+{% block breadcrumb_section %}QR Verification{% endblock %}
+{% block breadcrumb_current %}Dispenser {{ point.point_code }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card mx-auto" style="max-width: 680px; padding: 1.75rem;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+      <div>
+        <span class="badge bg-info" style="margin-bottom:0.4rem;">Charging Point Identification QR Verified</span>
+        <h1 style="margin:0.2rem 0; font-size:1.5rem;">{{ point.station_name }}</h1>
+        <div class="text-dim" style="font-size:0.86rem;">{{ point.address }}, {{ point.city }}</div>
+      </div>
+      <div style="text-align:right; font-size:0.8rem;" class="text-dim">
+        Scans recorded: <strong>{{ point.scan_count }}</strong><br>
+        Token: <code>{{ point.qr_token[:12] }}&hellip;</code>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.75rem; padding:1rem; border-radius:10px; background:rgba(15,23,42,0.55); border:1px solid var(--border-color); margin-bottom:1.25rem;">
+      <div><div class="text-dim" style="font-size:0.74rem;">DISPENSER CODE</div><strong>{{ point.point_code }}</strong></div>
+      <div><div class="text-dim" style="font-size:0.74rem;">CONNECTOR</div><strong>{{ point.connector_type }}</strong></div>
+      <div><div class="text-dim" style="font-size:0.74rem;">RATED POWER</div><strong>{{ "%.1f"|format(point.max_power_kw) }} kW</strong></div>
+      <div><div class="text-dim" style="font-size:0.74rem;">TARIFF RATE</div><strong>&#8377;{{ "%.2f"|format(point.tariff_per_kwh) }}/kWh</strong></div>
+    </div>
+
+    <div class="alert alert-info" style="font-size:0.85rem; margin-bottom:1.25rem;">
+      <strong>QR Scope Notice:</strong> This QR identifies physical charging dispenser <strong>{{ point.point_code }}</strong> only. It is not a payment QR and never marks a payment completed.
+      {% if point.provenance_category == 'B_THIRD_PARTY_API' %}
+        Third-party directory record ({{ point.verification_status }}) &mdash; live occupancy telemetry is not connected.
+      {% endif %}
+    </div>
+
+    <div style="display:flex; gap:0.65rem; flex-wrap:wrap;">
+      <a href="{{ url_for('public.station_detail', station_id=point.station_id) }}" class="btn btn-secondary">
+        View Station Hub
+      </a>
+      {% if point.point_status == 'AVAILABLE' %}
+        <a href="{{ url_for('customer.book_slot', point_id=point.point_id) }}" class="btn btn-primary">
+          Reserve This Dispenser &rarr;
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

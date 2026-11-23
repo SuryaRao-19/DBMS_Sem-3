@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}QR Scanner — EZ Charge Network Portal{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <h1 style="margin:0 0 0.35rem 0;">Scan Charger Placard or Check-in QR</h1>
+  <p class="page-subtitle" style="margin:0;">
+    Scan any on-site Tata Power EZ Charge QR sticker or manual token to instantly unlock a dispenser.
+  </p>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:1.75rem;">
+  <!-- Camera Scanner Box -->
+  <div class="card">
+    <h3 style="margin:0 0 1rem 0; font-size:1.15rem;">Camera Scanner</h3>
+
+    <div id="qrReader" style="width:100%; border-radius:8px; overflow:hidden; border:1px solid var(--color-border); background:#080E1A; min-height:260px;"></div>
+
+    <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+      <button type="button" id="startCamBtn" class="btn btn-primary btn-sm" style="flex:1;" onclick="startCamera()">
+        📷 Open Camera
+      </button>
+      <button type="button" id="stopCamBtn" class="btn btn-secondary btn-sm" style="display:none;" onclick="stopCamera()">
+        Stop Camera
+      </button>
+    </div>
+
+    <div style="margin-top:1.25rem; font-size:0.8rem; color:var(--text-dim); line-height:1.4;">
+      Ensure camera permissions are allowed in your browser. Point camera at any Charging Point or Station QR placard.
+    </div>
+  </div>
+
+  <!-- Manual Entry & Resolution Result Card -->
+  <div class="card" style="align-self:start;">
+    <h3 style="margin:0 0 1rem 0; font-size:1.15rem;">Manual Code Lookup</h3>
+
+    <div class="form-group">
+      <label class="form-label" for="manualTokenInput">QR Token or URL</label>
+      <div style="display:flex; gap:0.5rem;">
+        <input type="text" id="manualTokenInput" class="form-control" placeholder="Paste QR token or scan URL...">
+        <button type="button" class="btn btn-primary" onclick="resolveManualToken()">Lookup</button>
+      </div>
+    </div>
+
+    <!-- Resolved Placard Card -->
+    <div id="resolvedCard" style="display:none; padding:1.25rem; border-radius:8px; background:rgba(6,182,212,0.06); border:1px solid rgba(6,182,212,0.3); margin-top:1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+        <span class="badge badge-success" id="resTypeBadge">POINT</span>
+        <span style="font-size:0.75rem; color:var(--text-dim);" id="resTokenText"></span>
+      </div>
+
+      <h4 style="margin:0 0 0.35rem 0; font-size:1.15rem;" id="resTitle">Dispenser Placard</h4>
+      <p style="font-size:0.85rem; color:var(--text-dim); margin:0 0 1rem 0;" id="resDesc"></p>
+
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        <a id="resActionBtn" href="#" class="btn btn-primary btn-block" style="text-align:center;">
+          Proceed to Action &rarr;
+        </a>
+        <a id="resSecondaryBtn" href="#" class="btn btn-secondary btn-block" style="display:none; text-align:center;">
+          View Station Hub &rarr;
+        </a>
+      </div>
+    </div>
+
+    <div id="resolveError" style="display:none; padding:0.75rem; border-radius:8px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#EF4444; font-size:0.85rem; margin-top:1rem;"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let html5QrCode = null;
+
+async function handleScanSuccess(decodedText) {
+  if (html5QrCode) {
+    stopCamera();
+  }
+  document.getElementById('manualTokenInput').value = decodedText;
+  await resolveQrData(decodedText);
+}
+
+function startCamera() {
+  const qrEl = document.getElementById('qrReader');
+  if (!html5QrCode) {
+    html5QrCode = new Html5Qrcode('qrReader');
+  }
+
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    handleScanSuccess,
+    (errorMessage) => { /* scanning in progress */ }
+  ).then(() => {
+    document.getElementById('startCamBtn').style.display = 'none';
+    document.getElementById('stopCamBtn').style.display = 'inline-block';
+  }).catch((err) => {
+    alert('Unable to access camera: ' + err);
+  });
+}
+
+function stopCamera() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      document.getElementById('startCamBtn').style.display = 'inline-block';
+      document.getElementById('stopCamBtn').style.display = 'none';
+    }).catch(err => console.error(err));
+  }
+}
+
+async function resolveManualToken() {
+  const input = document.getElementById('manualTokenInput').value.trim();
+  if (!input) {
+    alert('Please enter or paste a QR code or token.');
+    return;
+  }
+  await resolveQrData(input);
+}
+
+async function resolveQrData(token) {
+  const errBox = document.getElementById('resolveError');
+  const card = document.getElementById('resolvedCard');
+  errBox.style.display = 'none';
+  card.style.display = 'none';
+
+  try {
+    const res = await csrfFetch(`/api/qr/resolve?token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to resolve QR token.');
+    }
+
+    const info = data.data;
+    document.getElementById('resTypeBadge').textContent = info.qr_type;
+    document.getElementById('resTokenText').textContent = info.token;
+    document.getElementById('resTitle').textContent = info.title;
+    document.getElementById('resDesc').textContent = info.description;
+    document.getElementById('resActionBtn').href = info.action_url;
+    
+    const secBtn = document.getElementById('resSecondaryBtn');
+    if (info.qr_type === 'POINT') {
+      document.getElementById('resActionBtn').textContent = '⚡ Reserve & Pay for this Dispenser';
+      if (info.station_id) {
+        secBtn.href = `/customer/stations/${info.station_id}`;
+        secBtn.textContent = 'View Station Hub & Specs';
+        secBtn.style.display = 'block';
+      } else {
+        secBtn.style.display = 'none';
+      }
+    } else if (info.qr_type === 'STATION') {
+      document.getElementById('resActionBtn').textContent = 'View Station Hub & Live Specs';
+      if (info.reserve_url) {
+        secBtn.href = info.reserve_url;
+        secBtn.textContent = '⚡ Reserve Bay at this Station';
+        secBtn.style.display = 'block';
+      } else {
+        secBtn.style.display = 'none';
+      }
+    } else {
+      document.getElementById('resActionBtn').textContent = 'Open Booking Details';
+      secBtn.style.display = 'none';
+    }
+    card.style.display = 'block';
+  } catch (e) {
+    errBox.textContent = e.message;
+    errBox.style.display = 'block';
+  }
+}
+</script>
+{% endblock %}
+

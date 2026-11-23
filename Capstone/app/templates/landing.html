@@ -1,0 +1,557 @@
+{% extends "base.html" %}
+
+{% block title %}EZ Charge Network Portal — Tata Power EZ Charge Reference Demo (EV ChargeNet){% endblock %}
+{% block breadcrumb_section %}Overview{% endblock %}
+{% block breadcrumb_current %}EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="landing-wrapper">
+
+  <!-- 1. HERO SECTION -->
+  <section class="hero-showcase">
+    <div>
+      <div class="disclaimer-banner" style="margin-bottom:1.15rem;">
+        <strong>Independent Academic Demonstration — Tata Power EZ Charge Reference Network:</strong> Built on the EV ChargeNet Flask &amp; MySQL engine using publicly verifiable company disclosures. <strong>Not an official Tata Power application</strong> and does not control live company chargers.
+      </div>
+      <h1 class="hero-headline">
+        Power Every Journey.<br>
+        <span class="accent-span">Charge Smarter.</span>
+      </h1>
+      <p style="color:var(--text-muted); font-size:1.05rem; max-width:58ch; margin-bottom:1.5rem;">
+        Explore verified charging locations, provenance-tagged network statistics, Station Identification QR placards, and Razorpay Test Mode billing modeled on the Tata Power EZ Charge ecosystem across Delhi NCR and India.
+      </p>
+
+      <div style="display:flex; gap:0.85rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+        <a href="{{ url_for('public.browse_stations') }}" class="btn btn-primary btn-lg">
+          Find Charging Stations &rarr;
+        </a>
+        <a href="{{ url_for('public.about') }}" class="btn btn-secondary btn-lg">
+          Explore Our Network
+        </a>
+        {% if session.get('user_id') %}
+          <a href="{{ url_for('admin.dashboard' if session.get('role') == 'ADMIN' else 'owner.dashboard') }}" class="btn btn-secondary btn-lg">
+            Open Console
+          </a>
+        {% else %}
+          <a href="{{ url_for('auth.register') }}" class="btn btn-secondary btn-lg">Create Free Account</a>
+        {% endif %}
+      </div>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; font-size:0.8rem; color:var(--text-dim);">
+        <span class="integrity-pill integrity-verified">{{ metrics.verified_stations }} VERIFIED COORDINATE STATIONS</span>
+        <span class="integrity-pill integrity-estimated">{{ metrics.pending_verification_stations }} CANDIDATES PENDING VERIFICATION</span>
+        <span class="integrity-pill integrity-demo">RAZORPAY TEST MODE &amp; DUAL QR</span>
+      </div>
+    </div>
+
+    <div class="hero-photo-frame">
+      <img src="{{ url_for('static', filename='images/hero-ev-charging.jpg') }}" alt="Illustrative electric vehicle connected to an urban DC fast charger pedestal">
+      <div class="hero-photo-caption">
+        <span>Illustrative EV fast-charging infrastructure render (academic demonstration media — not an on-site station photo)</span>
+        <span class="integrity-pill integrity-demo">ILLUSTRATIVE MEDIA</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. NETWORK OVERVIEW (OFFICIAL PRESS RELEASE BASELINE VS LOCAL SANDBOX) -->
+  <section class="section-block">
+    <div class="card" style="padding:2rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1.5rem; margin-bottom:1.25rem;">
+        <div style="max-width:74ch;">
+          <span class="section-tag">TYPE A: OFFICIAL TATA POWER EZ CHARGE METRICS</span>
+          <h2>Pan-India Reference Scale (Oct 2026 Press Release Baseline)</h2>
+          <p class="text-muted" style="margin-top:0.35rem;">
+            Figures below come from Tata Power's official corporate announcements and EZ Charge portal.
+            <strong>Scope &amp; Timeline Note:</strong> Tata Power's Oct 12, 2026 press release cites <strong>6,700+</strong> public, semi-public, and captive charging points across <strong>700+ cities</strong>, <strong>2.5 lakh+</strong> home chargers, and <strong>1,200+</strong> e-bus charging points serving <strong>7 lakh+</strong> registered EZ Charge customers; earlier corporate portal snapshots cite <strong>5,500+</strong> public/captive points across <strong>620+</strong> cities depending on public-vs-captive inclusion.
+          </p>
+        </div>
+        <div style="display:flex; gap:0.65rem; flex-wrap:wrap;">
+          <a href="https://www.tatapower.com/ezcharge/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">Official Portal &nearr;</a>
+          <a href="{{ url_for('public.data_sources') }}" class="btn btn-primary btn-sm">View Data Provenance &rarr;</a>
+        </div>
+      </div>
+
+      <div class="grid-cols-3" style="margin-bottom:1.35rem;">
+        {% for stat in official_stats %}
+          <div class="card stat-card cyan" style="background:rgba(11,18,32,0.75);">
+            <span class="integrity-pill integrity-verified" style="width:fit-content;">OFFICIAL DISCLOSURE</span>
+            <div class="stat-value" style="margin-top:0.25rem;">{{ stat.value }}</div>
+            <div style="font-weight:700; font-size:0.95rem;">{{ stat.label }}</div>
+            <div class="stat-subtext">
+              Source: <a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_label }} &nearr;</a><br>
+              Published / Verified: {{ stat.published_date or stat.verified_date }} &bull; Last checked: {{ stat.verified_date }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div style="border-top:1px solid var(--border-color); padding-top:1.25rem; margin-bottom:0.85rem;">
+        <span class="section-tag" style="color:var(--accent-amber);">TYPE B / C: LOCAL ACADEMIC SANDBOX TELEMETRY (NOT REAL COMPANY DATA)</span>
+      </div>
+
+      <div class="grid-cols-4" style="margin-bottom:0;">
+        <div class="card stat-card" style="background:rgba(11,18,32,0.45);">
+          <span class="integrity-pill integrity-verified" style="width:fit-content;">PORTAL STATION DB</span>
+          <div class="stat-value">{{ metrics.total_stations }}</div>
+          <div class="stat-subtext">Active Stations in Demo Portal ({{ metrics.verified_stations }} coordinate-verified, {{ metrics.pending_verification_stations }} pending verification across {{ city_count }} cities)</div>
+        </div>
+        <div class="card stat-card" style="background:rgba(11,18,32,0.45);">
+          <span class="integrity-pill integrity-demo" style="width:fit-content;">DEMO DISPENSERS</span>
+          <div class="stat-value">{{ metrics.total_points }}</div>
+          <div class="stat-subtext">{{ metrics.available_points }} Simulated Charging Points Available &mdash; not live hardware telemetry</div>
+        </div>
+        <div class="card stat-card amber" style="background:rgba(11,18,32,0.45);">
+          <span class="integrity-pill integrity-demo" style="width:fit-content;">DEMO METERING</span>
+          <div class="stat-value">{{ "%.1f"|format(metrics.total_energy_kwh) }} kWh</div>
+          <div class="stat-subtext">{{ metrics.completed_sessions }} Simulated Completed Sessions</div>
+        </div>
+        <div class="card stat-card indigo" style="background:rgba(11,18,32,0.45);">
+          <span class="integrity-pill integrity-demo" style="width:fit-content;">TEST MODE LEDGER</span>
+          <div class="stat-value">₹{{ "%.0f"|format(metrics.total_revenue) }}</div>
+          <div class="stat-subtext">Razorpay Test Mode / Demo Ledger (No Real Money)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. ABOUT THE NETWORK & 4. CHARGING SOLUTIONS -->
+  <section class="section-block">
+    <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem;">
+      <div>
+        <span class="section-tag">ABOUT &amp; CHARGING SOLUTIONS</span>
+        <h2>Full-Spectrum Tata Power EZ Charge Ecosystem</h2>
+        <p class="text-muted">Covers residential home wallboxes, public highway/urban chargers, commercial workplace &amp; fleet hubs, and heavy-duty e-bus depots. Images are illustrative representations.</p>
+      </div>
+      <a href="{{ url_for('public.about') }}" class="btn btn-secondary btn-sm">About Reference Network &rarr;</a>
+    </div>
+
+    <div class="grid-cols-4" style="margin-bottom:0;">
+      <article class="card media-card">
+        <div class="media-card-img-wrap">
+          <img src="{{ url_for('static', filename='images/home-ac-charger.jpg') }}" alt="Illustrative residential AC Type-2 wallbox charger installed in a home bay" loading="lazy">
+        </div>
+        <div class="media-card-body">
+          <span class="integrity-pill integrity-verified" style="width:fit-content;">HOME CHARGING</span>
+          <h3>Home &amp; RWA AC Wallboxes</h3>
+          <p class="text-muted" style="font-size:0.86rem;">Dedicated 3.3 kW–7.4 kW / 22 kW smart wallboxes aligned with Tata Power's 2.5 lakh+ residential charger footprint across India.</p>
+        </div>
+      </article>
+
+      <article class="card media-card">
+        <div class="media-card-img-wrap">
+          <img src="{{ url_for('static', filename='images/dc-fast-charger.jpg') }}" alt="Illustrative public CCS2 DC fast charger connected to an electric SUV" loading="lazy">
+        </div>
+        <div class="media-card-body">
+          <span class="integrity-pill integrity-verified" style="width:fit-content;">PUBLIC CHARGING</span>
+          <h3>Urban &amp; Highway DC Fast Hubs</h3>
+          <p class="text-muted" style="font-size:0.86rem;">25 kW–120 kW CCS2 &amp; CHAdeMO public charging points across metro plazas, malls, hospitality venues, and intercity highways.</p>
+        </div>
+      </article>
+
+      <article class="card media-card">
+        <div class="media-card-img-wrap">
+          <img src="{{ url_for('static', filename='images/hero-ev-charging.jpg') }}" alt="Illustrative workplace and commercial fleet charging bays at dusk" loading="lazy">
+        </div>
+        <div class="media-card-body">
+          <span class="integrity-pill integrity-verified" style="width:fit-content;">WORKPLACE &amp; FLEET</span>
+          <h3>Workplace &amp; Commercial Fleets</h3>
+          <p class="text-muted" style="font-size:0.86rem;">Semi-public and captive AC/DC dispensers for IT parks, corporate offices, last-mile logistics, and ride-hailing EV operators.</p>
+        </div>
+      </article>
+
+      <article class="card media-card">
+        <div class="media-card-img-wrap">
+          <img src="{{ url_for('static', filename='images/fleet-ebus-charging.jpg') }}" alt="Illustrative electric buses lined up under depot high-power chargers" loading="lazy">
+        </div>
+        <div class="media-card-body">
+          <span class="integrity-pill integrity-verified" style="width:fit-content;">E-BUS DEPOT</span>
+          <h3>Municipal E-Bus Depot Charging</h3>
+          <p class="text-muted" style="font-size:0.86rem;">180 kW–240 kW heavy-duty pantograph and dual-gun DC depot chargers supporting 1,200+ e-bus charging points nationwide.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- 5. STATION FINDER & INTERACTIVE MAP + 6. FEATURED STATIONS -->
+  <section class="section-block">
+    <div class="card" style="padding:1.5rem; margin-bottom:1.5rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:1.15rem;">
+        <div>
+          <span class="section-tag">STATION FINDER &amp; INTERACTIVE MAP</span>
+          <h2>Explore Coordinate-Verified Reference Stations</h2>
+          <p class="text-muted">Only stations with <code>VERIFIED</code> or approved coordinates plot on the map; press-release candidate hubs with missing coordinates remain excluded until verified.</p>
+        </div>
+        <a href="{{ url_for('public.browse_stations') }}" class="btn btn-primary btn-sm">Open Full Directory &amp; Near Me &rarr;</a>
+      </div>
+
+      <form method="GET" action="{{ url_for('public.browse_stations') }}" class="filter-form-grid" style="margin-bottom:1rem;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="homeSearchQ">Station Name, Area, or PIN Code</label>
+          <input id="homeSearchQ" type="text" name="q" class="form-control" placeholder="e.g. Janpath, Connaught Place, Sector 29">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="homeSearchCity">City / Corridor</label>
+          <select id="homeSearchCity" name="city" class="form-control">
+            <option value="">All Cities</option>
+            {% for c in ncr_cities %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="homeSearchSpeed">Charger Speed</label>
+          <select id="homeSearchSpeed" name="speed" class="form-control">
+            <option value="">Any Output</option>
+            <option value="FAST">DC Ultra-Fast (50+ kW)</option>
+            <option value="RAPID">DC Rapid (22–49 kW)</option>
+            <option value="AC">AC Standard (&lt;22 kW)</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Search Network</button>
+      </form>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+        <span id="landingMapStatus" class="text-muted" style="font-size:0.8rem;">Loading verified station pins...</span>
+        <div class="ncr-pills" style="margin-bottom:0;">
+          {% for c in ncr_cities %}
+            <a href="{{ url_for('public.browse_stations', city=c) }}" class="ncr-pill">{{ c }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div id="landingMap"
+           class="ev-map-container"
+           data-ev-map
+           data-maps-key="{{ google_maps_api_key }}"
+           data-api-url="{{ url_for('api.stations_map_feed') }}"
+           data-status-target="landingMapStatus"></div>
+    </div>
+
+    <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem;">
+      <div>
+        <span class="section-tag">VERIFIED &amp; REFERENCED STATIONS</span>
+        <h2>Station Directory Preview</h2>
+        <p class="text-muted">Availability not connected &mdash; demonstration data. Station locations show explicit verification provenance.</p>
+      </div>
+      <a href="{{ url_for('public.browse_stations') }}" class="btn btn-secondary btn-sm">View All {{ station_count }} Hubs &rarr;</a>
+    </div>
+
+    <div class="grid-cols-3" style="margin-bottom:0;">
+      {% for station in featured_stations %}
+        <div class="card station-preview-card">
+          <div class="station-card-top">
+            <span class="integrity-pill integrity-{{ (station.verification_status or 'verified').lower() }}">{{ station.verification_status or 'VERIFIED' }}</span>
+            <span class="station-city-badge">{{ station.city }}</span>
+          </div>
+
+          <h3 class="station-name-title" style="margin-top:0.45rem;">{{ station.station_name }}</h3>
+          <p class="station-address-text" style="color:var(--text-muted); font-size:0.86rem;">
+            {% if station.latitude is not none and station.longitude is not none %}
+              {{ station.address }}{% if station.postal_code %} ({{ station.postal_code }}){% endif %}
+            {% else %}
+              {{ station.address }} &mdash; <strong>Location verification pending.</strong>
+            {% endif %}
+          </p>
+          <div style="font-size:0.76rem; color:var(--text-dim); margin-top:0.35rem;">
+            Availability not connected &mdash; demonstration data.
+          </div>
+
+          <div class="station-meta-row">
+            <div>
+              <span class="meta-label">Simulated Bays</span>
+              <span class="meta-val font-semibold">{{ station.available_points }} / {{ station.total_points }} Demo</span>
+            </div>
+            <div>
+              <span class="meta-label">Reference Output</span>
+              <span class="meta-val">{{ station.charger_capacity_kw or 'Reference Spec' }}</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.15rem; display:flex; gap:0.5rem;">
+            <a href="{{ url_for('public.station_detail', station_id=station.station_id) }}" class="btn btn-secondary btn-sm" style="flex:1;">
+              Inspect &amp; QR &rarr;
+            </a>
+            {% if station.maps_url and station.latitude is not none %}
+              <a href="{{ station.maps_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Maps &nearr;</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- 7. CHARGER CATEGORIES & 8. HOW IT WORKS (DUAL QR + RAZORPAY TEST MODE) -->
+  <section class="section-block">
+    <div class="card" style="padding:1.75rem; margin-bottom:1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+        <div>
+          <span class="section-tag">CHARGER HARDWARE &amp; STANDARDS</span>
+          <h2>Supported Connector Categories</h2>
+        </div>
+        <span class="integrity-pill integrity-estimated">kW ratings shown reflect reference specifications, not hardware-photo telemetry</span>
+      </div>
+      <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:1.15rem;">
+        <span class="tech-chip"><i class="fa-solid fa-bolt"></i> CCS2 DC Fast (25–120 kW)</span>
+        <span class="tech-chip"><i class="fa-solid fa-plug-circle-bolt"></i> CHAdeMO DC (50 kW)</span>
+        <span class="tech-chip"><i class="fa-solid fa-charging-station"></i> Type-2 AC (7.4–22 kW)</span>
+        <span class="tech-chip"><i class="fa-solid fa-gauge-high"></i> Bharat DC-001 (15 kW)</span>
+        <span class="tech-chip"><i class="fa-solid fa-plug"></i> Bharat AC-001 (3.3–10 kW)</span>
+        <span class="tech-chip"><i class="fa-solid fa-bus"></i> E-Bus Depot (180–240 kW)</span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:1.75rem;">
+      <span class="section-tag">HOW THIS PLATFORM WORKS</span>
+      <h2 style="margin-bottom:1rem;">End-to-End Academic EV Charging &amp; Dual QR Workflow</h2>
+      <div class="grid-cols-4" style="margin-bottom:0;">
+        <div>
+          <strong>1. Scan Station QR / Locate Hub</strong>
+          <p class="text-muted" style="font-size:0.85rem; margin-top:0.3rem;">Inspect coordinate-verified hubs or scan a physical Station Identification QR placard (<code>/qr/station/&lt;token&gt;</code>).</p>
+        </div>
+        <div>
+          <strong>2. Book Demo Time Slot</strong>
+          <p class="text-muted" style="font-size:0.85rem; margin-top:0.3rem;">MySQL triggers validate zero overlap and lock your simulated bay slot cleanly.</p>
+        </div>
+        <div>
+          <strong>3. Simulate Delivery</strong>
+          <p class="text-muted" style="font-size:0.85rem; margin-top:0.3rem;">Stored procedure <code>CompleteChargingSession</code> calculates demo kWh, base tariff, and 18% GST.</p>
+        </div>
+        <div>
+          <strong>4. Dynamic Payment QR &amp; Razorpay</strong>
+          <p class="text-muted" style="font-size:0.85rem; margin-top:0.3rem;">Generate a 10-minute expiring Dynamic Payment QR or launch Razorpay Test Mode Checkout with HMAC verification.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. OFFICIAL ANNOUNCEMENTS & 10. OFFICIAL APPS -->
+  <section class="section-block">
+    <div class="card technical-banner">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+        <div>
+          <span class="section-tag">OFFICIAL NEWS &amp; ANNOUNCEMENTS</span>
+          <h2>Verified Tata Power EZ Charge Updates &amp; Mobile Apps</h2>
+        </div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <a href="{{ platform_operator.play_store_url if platform_operator and platform_operator.play_store_url else 'https://play.google.com/store/apps/details?id=com.tatapower.evapp' }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Google Play (EZ Charge) &nearr;</a>
+          <a href="{{ platform_operator.app_store_url if platform_operator and platform_operator.app_store_url else 'https://apps.apple.com/in/app/tata-power-ez-charge/id1496350476' }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">Apple App Store &nearr;</a>
+        </div>
+      </div>
+
+      <div class="grid-cols-3" style="margin-bottom:0;">
+        {% for ann in announcements %}
+          <div style="padding:1.1rem; background:rgba(11,18,32,0.55); border:1px solid var(--border-color); border-radius:var(--radius-md);">
+            <span class="integrity-pill integrity-{{ ann.status.lower() }}">{{ ann.status }}</span>
+            <h3 style="font-size:1rem; margin-top:0.55rem;">{{ ann.title }}</h3>
+            <p class="text-muted" style="font-size:0.84rem; margin-top:0.35rem;">{{ ann.summary }}</p>
+            {% if ann.published_at %}
+              <div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.4rem;">Published: {{ ann.published_at }}</div>
+            {% endif %}
+            {% if ann.source_url %}
+              <a href="{{ ann.source_url }}" target="_blank" rel="noopener noreferrer" style="font-size:0.78rem; display:inline-block; margin-top:0.35rem;">{{ ann.source_name }} &nearr;</a>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. STAY CONNECTED WITH TATA POWER (OFFICIAL SOCIAL MEDIA CARDS) -->
+  <section class="section-block social-showcase-section">
+    <div class="card" style="padding:2.25rem 2rem; background:rgba(17, 28, 46, 0.7); border:1px solid var(--color-border); border-radius:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1.25rem; margin-bottom:0.75rem;">
+        <div>
+          <span class="section-tag" style="color:var(--accent-cyan); display:flex; align-items:center; gap:0.4rem;">
+            <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i> OFFICIAL TATA POWER CORPORATE CHANNELS
+          </span>
+          <h2 style="font-size:1.85rem; font-weight:800; color:#F8FAFC; margin:0.35rem 0 0.4rem 0;">Stay Connected With Tata Power</h2>
+          <p class="text-muted" style="font-size:0.96rem; max-width:74ch; margin:0; line-height:1.6;">
+            Follow Tata Power for the latest updates on electric mobility, sustainable energy, EV charging infrastructure and innovation.
+          </p>
+        </div>
+        <div style="display:flex; gap:0.65rem; flex-wrap:wrap; align-items:center;">
+          <a href="https://www.tatapower.com/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" aria-label="Visit Tata Power Corporate Website (opens in new tab)">
+            <i class="fa-solid fa-globe" aria-hidden="true"></i> tatapower.com &nearr;
+          </a>
+          <a href="https://www.tatapower.com/ezcharge" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" aria-label="Visit Tata Power EZ Charge Portal (opens in new tab)">
+            <i class="fa-solid fa-bolt" aria-hidden="true"></i> EZ Charge &nearr;
+          </a>
+          <a href="https://linktr.ee/Tata_Power_EZ_Charge" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" aria-label="Open Tata Power EZ Charge Linktree Collection (opens in new tab)">
+            <i class="fa-solid fa-tree" aria-hidden="true"></i> Linktree &nearr;
+          </a>
+        </div>
+      </div>
+
+      <!-- 5 Social Media Cards Grid -->
+      <div class="social-cards-grid">
+        <!-- 1. Instagram -->
+        <div class="social-card instagram">
+          <div>
+            <div class="social-card-top">
+              <div class="social-card-icon-wrap" aria-hidden="true">
+                <i class="fa-brands fa-instagram" style="font-size:22px;"></i>
+              </div>
+              <div class="social-card-meta">
+                <h3 class="social-card-title">Instagram</h3>
+                <div class="social-card-handle">@tatapowercompanyltd</div>
+              </div>
+            </div>
+            <p class="social-card-desc">
+              Visual stories of EV charging hubs, highway corridors, green energy milestones, and community sustainability initiatives.
+            </p>
+          </div>
+          <a href="https://www.instagram.com/tatapowercompanyltd/" target="_blank" rel="noopener noreferrer" class="social-card-btn" aria-label="Follow Tata Power on Instagram (opens in new tab)">
+            <span>Follow on Instagram</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:12px;" aria-hidden="true"></i>
+          </a>
+        </div>
+
+        <!-- 2. Facebook -->
+        <div class="social-card facebook">
+          <div>
+            <div class="social-card-top">
+              <div class="social-card-icon-wrap" aria-hidden="true">
+                <i class="fa-brands fa-facebook-f" style="font-size:20px;"></i>
+              </div>
+              <div class="social-card-meta">
+                <h3 class="social-card-title">Facebook</h3>
+                <div class="social-card-handle">tatapower</div>
+              </div>
+            </div>
+            <p class="social-card-desc">
+              Corporate announcements, nationwide EV charging infrastructure updates, sustainability articles, and customer care alerts.
+            </p>
+          </div>
+          <a href="https://www.facebook.com/tatapower/" target="_blank" rel="noopener noreferrer" class="social-card-btn" aria-label="Visit Tata Power on Facebook (opens in new tab)">
+            <span>Visit on Facebook</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:12px;" aria-hidden="true"></i>
+          </a>
+        </div>
+
+        <!-- 3. X (Twitter) -->
+        <div class="social-card x-twitter">
+          <div>
+            <div class="social-card-top">
+              <div class="social-card-icon-wrap" aria-hidden="true">
+                <i class="fa-brands fa-x-twitter" style="font-size:20px;"></i>
+              </div>
+              <div class="social-card-meta">
+                <h3 class="social-card-title">X</h3>
+                <div class="social-card-handle">@tatapower</div>
+              </div>
+            </div>
+            <p class="social-card-desc">
+              Real-time charging updates, customer support announcements, electric mobility news, and renewable energy innovation.
+            </p>
+          </div>
+          <a href="https://x.com/tatapower" target="_blank" rel="noopener noreferrer" class="social-card-btn" aria-label="Follow Tata Power on X (opens in new tab)">
+            <span>Follow on X</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:12px;" aria-hidden="true"></i>
+          </a>
+        </div>
+
+        <!-- 4. LinkedIn -->
+        <div class="social-card linkedin">
+          <div>
+            <div class="social-card-top">
+              <div class="social-card-icon-wrap" aria-hidden="true">
+                <i class="fa-brands fa-linkedin-in" style="font-size:20px;"></i>
+              </div>
+              <div class="social-card-meta">
+                <h3 class="social-card-title">LinkedIn</h3>
+                <div class="social-card-handle">Tata Power</div>
+              </div>
+            </div>
+            <p class="social-card-desc">
+              Strategic enterprise fleet partnerships, corporate leadership, clean energy transition milestones, and career opportunities.
+            </p>
+          </div>
+          <a href="https://www.linkedin.com/company/tata-power/" target="_blank" rel="noopener noreferrer" class="social-card-btn" aria-label="Connect with Tata Power on LinkedIn (opens in new tab)">
+            <span>Connect on LinkedIn</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:12px;" aria-hidden="true"></i>
+          </a>
+        </div>
+
+        <!-- 5. YouTube -->
+        <div class="social-card youtube">
+          <div>
+            <div class="social-card-top">
+              <div class="social-card-icon-wrap" aria-hidden="true">
+                <i class="fa-brands fa-youtube" style="font-size:22px;"></i>
+              </div>
+              <div class="social-card-meta">
+                <h3 class="social-card-title">YouTube</h3>
+                <div class="social-card-handle"><a href="https://www.youtube.com/@TataPowerCompanyLtd" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;">@TataPowerCompanyLtd</a></div>
+              </div>
+            </div>
+            <p class="social-card-desc">
+              Video guides on EV fast charging, charging app walkthroughs, clean technology documentaries, and executive interviews.
+            </p>
+          </div>
+          <a href="https://www.youtube.com/channel/UCCz5pvnMkswgbWh5MKMH-vQ" target="_blank" rel="noopener noreferrer" class="social-card-btn" aria-label="Subscribe to Tata Power on YouTube (opens in new tab)">
+            <span>Subscribe on YouTube</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:12px;" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Attribution & Disclaimer Callout -->
+      <div style="padding:0.85rem 1.15rem; background:rgba(0, 214, 160, 0.04); border:1px solid rgba(0, 214, 160, 0.2); border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; font-size:0.82rem;">
+        <span style="color:var(--text-dim);">
+          <strong style="color:var(--accent-emerald);">Attribution Note:</strong> The social media channels linked above are the official external corporate accounts operated by The Tata Power Company Limited. This academic demonstration does not operate or administer these channels.
+        </span>
+        <span style="color:var(--text-dim);">
+          Official Helpline: <strong>1800 833 2233</strong> &bull; Email: <strong>evsupport@tatapower.com</strong>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. ENQUIRIES & SUPPORT -->
+  <section class="section-block">
+    <div class="card" style="padding:2rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1.5rem;">
+        <div style="max-width:48ch;">
+          <span class="section-tag">ENQUIRIES &amp; SUPPORT</span>
+          <h2>Send a Platform Enquiry</h2>
+          <p class="text-muted" style="font-size:0.9rem; line-height:1.6; margin:0.4rem 0 1.25rem 0;">
+            Processed securely via our Flask backend proxy with CSRF protection, rate limiting, MySQL persistence, and Web3Forms delivery.
+          </p>
+          <div style="font-size:0.82rem; color:var(--text-dim); line-height:1.5;">
+            For official Tata Power EZ Charge customer assistance, please reach their 24&times;7 support at <strong>1800 833 2233</strong> or <strong>evsupport@tatapower.com</strong>.
+          </div>
+        </div>
+
+        <div style="flex:1; min-width:320px; max-width:640px;">
+          <form method="POST" action="{{ url_for('public.contact') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="botcheck" style="display:none;" tabindex="-1" autocomplete="off">
+            <div class="grid-cols-2" style="gap:0.75rem; margin-bottom:0.75rem;">
+              <input type="text" name="full_name" class="form-control" placeholder="Full Name *" required minlength="2">
+              <input type="email" name="email" class="form-control" placeholder="Email Address *" required>
+            </div>
+            <div class="grid-cols-2" style="gap:0.75rem; margin-bottom:0.75rem;">
+              <input type="text" name="subject" class="form-control" placeholder="Subject *" required minlength="3">
+              <select name="category" class="form-control" required>
+                {% for cat in contact_categories %}
+                  <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <textarea name="message" class="form-control" rows="3" placeholder="How can we help with this demo platform?" required minlength="10" style="margin-bottom:0.85rem;"></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+              <a href="{{ url_for('public.contact') }}" style="font-size:0.84rem;">Open full contact page &rarr;</a>
+              <button type="submit" class="btn btn-primary btn-sm">Submit Enquiry</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/ev_map.js') }}"></script>
+{% endblock %}

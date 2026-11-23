@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs & System Settings - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <h1 class="page-title">Audit Trail & System Configuration</h1>
+        <p class="page-subtitle">Track administrative operations and manage database-driven policy parameters.</p>
+    </div>
+</div>
+
+<!-- SYSTEM SETTINGS CARD -->
+<div class="card" style="margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 1.15rem; color: #f8fafc;">System Configuration Parameters</h3>
+        <span class="badge badge-success" style="font-size: 0.75rem;">Live from MySQL SystemSettings</span>
+    </div>
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Setting Key</th>
+                    <th>Current Value</th>
+                    <th>Description</th>
+                    <th>Last Updated</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in settings %}
+                <tr>
+                    <td><code>{{ s.setting_key }}</code></td>
+                    <td><strong style="color: #10b981;">{{ s.setting_value }}</strong></td>
+                    <td style="color: #94a3b8; font-size: 0.85rem;">{{ s.description or 'N/A' }}</td>
+                    <td style="color: #64748b; font-size: 0.82rem;">{{ s.updated_at }}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-outline btn-sm" onclick="openSettingModal('{{ s.setting_key }}', '{{ s.setting_value }}', '{{ s.description }}')">
+                            Edit
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="empty-state">No system settings found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- AUDIT LOGS CARD -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h3 style="margin: 0; font-size: 1.15rem; color: #f8fafc;">Administrative Audit Log</h3>
+            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #94a3b8;">Chronological record of privileged state changes.</p>
+        </div>
+        <form method="GET" action="{{ url_for('admin.audit_logs') }}" style="display: flex; gap: 8px; align-items: center;">
+            <select name="entity" class="form-control" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">
+                <option value="">All Entities</option>
+                <option value="Stations" {% if selected_entity == 'Stations' %}selected{% endif %}>Stations</option>
+                <option value="ChargingPoints" {% if selected_entity == 'ChargingPoints' %}selected{% endif %}>Charging Points</option>
+                <option value="Users" {% if selected_entity == 'Users' %}selected{% endif %}>Users</option>
+                <option value="SystemSettings" {% if selected_entity == 'SystemSettings' %}selected{% endif %}>System Settings</option>
+            </select>
+            <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+            {% if selected_entity %}
+            <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-outline btn-sm" style="color: #ef4444;">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Target ID</th>
+                    <th>Administrator</th>
+                    <th>Details</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td style="white-space: nowrap; font-size: 0.82rem; color: #94a3b8;">{{ log.created_at }}</td>
+                    <td>
+                        <span class="badge {% if 'CREATE' in log.action %}badge-success{% elif 'UPDATE' in log.action %}badge-warning{% elif 'DELETE' in log.action %}badge-danger{% else %}badge-info{% endif %}">
+                            {{ log.action }}
+                        </span>
+                    </td>
+                    <td><strong>{{ log.entity_name }}</strong></td>
+                    <td><code>#{{ log.entity_id or '-' }}</code></td>
+                    <td>{{ log.user_name or 'System' }} <br><span style="font-size: 0.75rem; color: #64748b;">{{ log.user_email or '' }}</span></td>
+                    <td style="font-size: 0.85rem; color: #cbd5e1; max-width: 320px;">{{ log.details or '-' }}</td>
+                    <td style="font-size: 0.8rem; color: #64748b;">{{ log.ip_address or 'Local' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="empty-state" style="text-align: center; padding: 40px;">
+                        No audit log entries recorded yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- EDIT SETTING MODAL -->
+<div id="settingModal" class="modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="width: 100%; max-width: 480px; margin: 20px;">
+        <h3 id="modalSettingKey" style="margin-top: 0; color: #f8fafc;">Edit Setting</h3>
+        <p id="modalSettingDesc" style="font-size: 0.85rem; color: #94a3b8;"></p>
+        
+        <form method="POST" action="{{ url_for('admin.update_setting_route') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="setting_key" id="inputSettingKey">
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="inputSettingVal">New Value</label>
+                <input type="text" name="setting_value" id="inputSettingVal" class="form-control" required>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-outline" onclick="closeSettingModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openSettingModal(key, val, desc) {
+    document.getElementById('modalSettingKey').innerText = 'Edit Setting: ' + key;
+    document.getElementById('modalSettingDesc').innerText = desc || '';
+    document.getElementById('inputSettingKey').value = key;
+    document.getElementById('inputSettingVal').value = val;
+    document.getElementById('settingModal').style.display = 'flex';
+}
+
+function closeSettingModal() {
+    document.getElementById('settingModal').style.display = 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}My Stations — Partner Console — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.75rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">My Charging Stations</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Hubs assigned to your partner account. You can update operating hours, contact phone numbers, and inspect dispensers.
+    </p>
+  </div>
+</div>
+
+{% if stations %}
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:1.25rem;">
+    {% for st in stations %}
+      <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
+            <div>
+              <span class="badge badge-secondary" style="font-size:0.72rem;">{{ st.operator_name or 'Tata Power EZ Charge' }}</span>
+              <h3 style="margin:0.25rem 0 0 0; font-size:1.2rem;">{{ st.station_name }}</h3>
+            </div>
+            <span class="badge {% if st.station_status == 'ACTIVE' %}badge-success{% else %}badge-warning{% endif %}">
+              {{ st.station_status }}
+            </span>
+          </div>
+
+          <p style="font-size:0.85rem; color:var(--text-dim); margin:0 0 1rem 0; line-height:1.4;">
+            📍 {{ st.address }}, {{ st.city }}
+          </p>
+
+          <div style="padding:0.75rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); font-size:0.85rem; margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:var(--text-dim);">Operating Hours:</span>
+              <span>{{ st.opening_time or '24/7' }} - {{ st.closing_time or '' }}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:var(--text-dim);">On-site Phone:</span>
+              <span>{{ st.contact_phone or 'N/A' }}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-dim);">Dispensers Online:</span>
+              <strong>{{ st.total_points }} ({{ st.available_points or 0 }} available)</strong>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; padding-top:0.75rem; border-top:1px solid var(--color-border);">
+          <a href="{{ url_for('owner.station_edit', station_id=st.station_id) }}" class="btn btn-primary btn-sm" style="flex:1; text-align:center;">
+            Edit Station Settings
+          </a>
+          <a href="{{ url_for('owner.points') }}" class="btn btn-secondary btn-sm">
+            Dispensers
+          </a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">📍⚡</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Stations Linked to Your Account</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto 1.5rem auto;">
+      Once platform administration approves your location application or assigns a station, it will appear here for full operational control.
+    </p>
+    <a href="{{ url_for('owner.apply') }}" class="btn btn-primary">
+      Submit a Station Application
+    </a>
+  </div>
+{% endif %}
+{% endblock %}

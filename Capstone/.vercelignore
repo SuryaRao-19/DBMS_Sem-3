@@ -1,0 +1,21 @@
+# Local environment secrets and OS files
+.env
+.env.*
+!.env.example
+
+# Tests, documentation, and local artifacts
+tests/
+docs/
+screenshots/
+scratch/
+*.docx
+*.log
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+venv/
+.venv/
+.git/
+

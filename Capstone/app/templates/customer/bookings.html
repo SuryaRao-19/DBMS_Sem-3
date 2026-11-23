@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}My Bookings — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.75rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">My Bookings &amp; Reservations</h1>
+    <p class="page-subtitle" style="margin:0;">
+      View your upcoming charging reservations, Booking Check-In Verification QRs, and cancellation options.
+    </p>
+  </div>
+  <a href="{{ url_for('customer.stations') }}" class="btn btn-primary btn-sm">
+    <span>+</span> Reserve a Charger
+  </a>
+</div>
+
+{% if bookings %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-responsive">
+      <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--color-border); background:rgba(8,14,26,0.5);">
+            <th style="padding:0.85rem 1rem; text-align:left;">Booking ID</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Station &amp; Dispenser</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Vehicle</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Time Window</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Est. Energy &amp; Cost</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Status</th>
+            <th style="padding:0.85rem 1rem; text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bookings %}
+            <tr id="{{ b.booking_id }}" style="border-bottom:1px solid var(--color-border);">
+              <td style="padding:0.85rem 1rem; font-weight:700;">#{{ b.booking_id }}</td>
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;">{{ b.station_name }}</div>
+                <div style="font-size:0.8rem; color:var(--accent-cyan);">
+                  Dispenser {{ b.point_code }} ({{ b.connector_type }})
+                </div>
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <div>{{ b.make }} {{ b.model }}</div>
+                <div style="font-size:0.8rem; color:var(--text-dim);">{{ b.registration_no }}</div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem;">
+                <div><strong>Start:</strong> {{ b.start_at }}</div>
+                <div style="color:var(--text-dim);"><strong>End:</strong> {{ b.end_at }}</div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem;">
+                <div>{{ "%.2f"|format(b.estimated_energy_kwh or 0) }} kWh</div>
+                <strong style="color:#10B981;">₹{{ "%.2f"|format(b.estimated_cost or 0) }}</strong>
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <span class="badge {% if b.booking_status == 'CONFIRMED' %}badge-success{% elif b.booking_status == 'CANCELLED' %}badge-danger{% else %}badge-info{% endif %}">
+                  {{ b.booking_status }}
+                </span>
+              </td>
+              <td style="padding:0.85rem 1rem; text-align:right; white-space:nowrap;">
+                <div style="display:inline-flex; gap:0.4rem; align-items:center;">
+                  {% if b.booking_status != 'CANCELLED' %}
+                    {% if not b.is_paid %}
+                      <a href="{{ url_for('customer.booking_checkout', booking_id=b.booking_id) }}" class="btn btn-xs btn-primary" title="Settle via Razorpay Test Mode or Scan & Pay QR">
+                        Pay Slot
+                      </a>
+                    {% else %}
+                      <span class="badge badge-success" style="font-size:0.72rem;">Settled</span>
+                    {% endif %}
+                  {% endif %}
+                  {% if b.booking_status == 'CONFIRMED' and b.qr_token %}
+                    <a href="{{ url_for('customer.booking_qr_png', booking_id=b.booking_id) }}" target="_blank" class="btn btn-xs btn-outline-cyan" title="Download Check-in QR">
+                      QR Placard
+                    </a>
+                    <form method="POST" action="{{ url_for('customer.booking_cancel', booking_id=b.booking_id) }}" onsubmit="return confirm('Are you sure you want to cancel booking #{{ b.booking_id }}?');" style="display:inline;">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-xs btn-outline-danger">Cancel</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">📅⚡</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Reservations Scheduled</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto 1.5rem auto;">
+      Reserve an EV charging slot in advance to guarantee an available dispenser and avoid waiting times.
+    </p>
+    <a href="{{ url_for('customer.stations') }}" class="btn btn-primary">
+      Find a Station &amp; Reserve Slot
+    </a>
+  </div>
+{% endif %}
+{% endblock %}

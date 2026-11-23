@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Station Partner Operations — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">Station Partner Operations Console</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Hub oversight, dispenser telemetry, customer bookings, and revenue tracking across your assigned locations.
+    </p>
+  </div>
+  <div style="display:flex; gap:0.5rem;">
+    <a href="{{ url_for('owner.points') }}" class="btn btn-primary btn-sm">
+      <span>⚡</span> Manage Dispensers
+    </a>
+  </div>
+</div>
+
+<!-- Partner Scoped KPIs -->
+<div class="stats-grid" style="margin-bottom:2rem;">
+  <div class="stat-card">
+    <div class="stat-icon" style="color:var(--accent-cyan);">📍</div>
+    <div class="stat-value">{{ kpis.station_count }}</div>
+    <div class="stat-label">Assigned Stations</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon" style="color:#10B981;">⚡</div>
+    <div class="stat-value">{{ kpis.point_count }}</div>
+    <div class="stat-label">Total Dispensers Online</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon" style="color:#818CF8;">📅</div>
+    <div class="stat-value">{{ kpis.active_bookings }}</div>
+    <div class="stat-label">Active Reservations</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon" style="color:#F59E0B;">₹</div>
+    <div class="stat-value">₹{{ "%.2f"|format(kpis.total_revenue) }}</div>
+    <div class="stat-label">Total Partner Revenue</div>
+  </div>
+</div>
+
+<!-- Assigned Stations Overview -->
+<div class="card" style="margin-bottom:2rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <h3 style="margin:0; font-size:1.1rem;">My Charging Hubs</h3>
+    <a href="{{ url_for('owner.stations') }}" style="font-size:0.85rem; font-weight:600;">View all &rarr;</a>
+  </div>
+
+  {% if stations %}
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1rem;">
+      {% for st in stations %}
+        <div style="padding:1rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+              <h4 style="margin:0; font-size:1.05rem;">{{ st.station_name }}</h4>
+              <span class="badge {% if st.station_status == 'ACTIVE' %}badge-success{% else %}badge-warning{% endif %}">
+                {{ st.station_status }}
+              </span>
+            </div>
+            <p style="font-size:0.82rem; color:var(--text-dim); margin:0 0 0.75rem 0;">
+              📍 {{ st.city }} &bull; {{ st.address }}
+            </p>
+            <div style="font-size:0.8rem; color:var(--text-dim);">
+              Dispensers: <strong>{{ st.total_points }}</strong> ({{ st.available_points or 0 }} available, {{ st.in_use_points or 0 }} in use)
+            </div>
+          </div>
+          <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--color-border); display:flex; gap:0.5rem;">
+            <a href="{{ url_for('owner.station_edit', station_id=st.station_id) }}" class="btn btn-xs btn-secondary" style="flex:1; text-align:center;">
+              Configure Hub
+            </a>
+            <a href="{{ url_for('public.station_detail', station_id=st.station_id) }}" class="btn btn-xs btn-outline-cyan">
+              Public View
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="text-align:center; padding:2rem 1rem; color:var(--text-dim);">
+      <p style="margin:0;">No charging stations assigned to your partner account yet. Contact platform administration to link your hub.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Two-Column Grid: Recent Station Bookings & Sessions -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:1.5rem;">
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h3 style="margin:0; font-size:1.05rem;">Recent Customer Bookings</h3>
+      <a href="{{ url_for('owner.bookings') }}" style="font-size:0.82rem; font-weight:600;">View all &rarr;</a>
+    </div>
+
+    {% if recent_bookings %}
+      <div style="display:flex; flex-direction:column; gap:0.65rem;">
+        {% for b in recent_bookings %}
+          <div style="padding:0.75rem; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+              <strong>{{ b.customer_name }}</strong>
+              <span class="badge {% if b.booking_status == 'CONFIRMED' %}badge-success{% else %}badge-info{% endif %}">
+                {{ b.booking_status }}
+              </span>
+            </div>
+            <div style="color:var(--text-dim);">
+              {{ b.station_name }} &bull; Dispenser {{ b.point_code }} &bull; {{ b.registration_no }}
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.25rem;">
+              Slot: {{ b.start_at }} - {{ b.end_at }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="font-size:0.85rem; color:var(--text-dim); margin:0;">No customer bookings at your stations yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h3 style="margin:0; font-size:1.05rem;">Recent Charging Sessions</h3>
+      <a href="{{ url_for('owner.sessions') }}" style="font-size:0.82rem; font-weight:600;">View all &rarr;</a>
+    </div>
+
+    {% if recent_sessions %}
+      <div style="display:flex; flex-direction:column; gap:0.65rem;">
+        {% for s in recent_sessions %}
+          <div style="padding:0.75rem; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+              <strong>Dispenser {{ s.point_code }}</strong>
+              <strong style="color:#10B981;">₹{{ "%.2f"|format(s.total_cost or 0) }}</strong>
+            </div>
+            <div style="color:var(--text-dim);">
+              {{ s.customer_name }} &bull; {{ "%.2f"|format(s.energy_consumed_kwh or 0) }} kWh delivered
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.25rem;">
+              {{ s.start_time }} &bull; {{ s.payment_status or s.session_status }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="font-size:0.85rem; color:var(--text-dim); margin:0;">No charging sessions completed at your stations yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

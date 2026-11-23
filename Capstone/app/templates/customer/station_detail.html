@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}{{ station.station_name }} — Customer Mobility Portal{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endblock %}
+
+{% block content %}
+{% set is_coord_verified = (station.latitude is not none and station.longitude is not none and station.verification_status != 'PENDING_VERIFICATION') %}
+
+<!-- Breadcrumbs & Navigation Header -->
+<div class="page-header" style="margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+  <div>
+    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.45rem;">
+      <span class="badge {% if station.verification_status == 'VERIFIED' %}badge-success{% else %}badge-info{% endif %}">
+        {{ station.verification_status or 'VERIFIED' }}
+      </span>
+      <span class="badge badge-secondary">{{ station.city }}</span>
+      <span class="badge" style="background:rgba(0,200,255,0.15); color:var(--accent-cyan); border:1px solid rgba(0,200,255,0.3);">
+        {{ station.operator_name or 'Tata Power EZ Charge' }}
+      </span>
+    </div>
+    <h1 style="margin:0 0 0.35rem 0; font-size:1.75rem; font-weight:800;">{{ station.station_name }}</h1>
+    <p class="page-subtitle" style="margin:0; font-size:0.92rem; color:var(--text-dim);">
+      📍 {{ station.address }}{% if station.postal_code %} &bull; PIN: {{ station.postal_code }}{% endif %}, {{ station.state or 'India' }}
+    </p>
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+    <a href="{{ url_for('customer.stations') }}" class="btn btn-secondary btn-sm">&larr; Back to Stations</a>
+    {% if is_coord_verified and station.maps_url %}
+      <a href="{{ station.maps_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+        🗺️ Directions &nearr;
+      </a>
+    {% endif %}
+    <!-- Bookmark Toggle Form -->
+    <form method="POST" action="{{ url_for('customer.saved_station_toggle', station_id=station.station_id) }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm {% if is_saved %}btn-primary{% else %}btn-secondary{% endif %}" title="Toggle Bookmark">
+        <span>⭐</span> {% if is_saved %}Saved in Favorites{% else %}Save Station{% endif %}
+      </button>
+    </form>
+    <a href="{{ url_for('customer.payments') }}?tab=reserve&station_id={{ station.station_id }}" class="btn btn-primary btn-sm">
+      ⚡ Reserve a Slot &rarr;
+    </a>
+  </div>
+</div>
+
+<!-- Grid 1: Location & Live Weather + Data Provenance -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:1.5rem; margin-bottom:2rem;">
+  <!-- Left Card: Interactive Leaflet Map & Operating Hours -->
+  <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+    <div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <h3 style="margin:0; font-size:1.15rem;">Station Location &amp; Environment</h3>
+        {% if is_coord_verified %}
+          <span style="font-size:0.78rem; font-family:monospace; color:var(--accent-cyan);">
+            {{ "%.5f"|format(station.latitude) }}° N, {{ "%.5f"|format(station.longitude) }}° E
+          </span>
+        {% endif %}
+      </div>
+
+      {% if is_coord_verified %}
+        <div id="customerStationDetailMap" style="height:230px; border-radius:8px; border:1px solid var(--color-border); background:#080E1A; margin-bottom:0.85rem;"></div>
+      {% else %}
+        <div style="padding:2.5rem 1rem; text-align:center; background:rgba(245,158,11,0.06); border:1px dashed rgba(245,158,11,0.4); border-radius:8px; margin-bottom:0.85rem;">
+          <div style="font-size:1.8rem; margin-bottom:0.4rem;">📍</div>
+          <strong style="color:#F59E0B;">Coordinates Pending Verification</strong>
+          <p style="font-size:0.8rem; color:var(--text-dim); margin:0.35rem 0 0 0;">
+            Station address recorded in official directory. Exact GPS coordinates are being calibrated.
+          </p>
+        </div>
+      {% endif %}
+
+      <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; font-size:0.84rem; color:var(--text-dim); padding:0.5rem 0; border-top:1px solid var(--color-border);">
+        <span>🕒 <strong>Operating Hours:</strong> {{ station.opening_time or '00:00' }} &ndash; {{ station.closing_time or '23:59' }} (24x7)</span>
+        <span>⚡ <strong>Total Capacity:</strong> {{ station.charger_capacity_kw or '60 kW DC Fast' }}</span>
+      </div>
+    </div>
+
+    <!-- Live Weather Widget if available -->
+    {% if weather %}
+      <div style="margin-top:0.85rem; padding:0.75rem 1rem; border-radius:8px; background:rgba(0,214,160,0.05); border:1px solid rgba(0,214,160,0.2); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <span style="font-size:1.4rem;">🌤️</span>
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-primary);">
+              {{ weather.weather_desc or 'Clear Skies' }} &bull; {{ weather.temperature_c }}°C
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-dim);">
+              Wind: {{ weather.wind_speed_kmh or '5' }} km/h &bull; Humidity: {{ weather.humidity_pct or '45' }}%
+            </div>
+          </div>
+        </div>
+        <span style="font-size:0.72rem; color:var(--text-dim);">Live via Open-Meteo</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Right Card: Station Technical Specs & QR Placard -->
+  <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+    <div>
+      <h3 style="margin:0 0 1rem 0; font-size:1.15rem;">Technical Specifications &amp; QR Placard</h3>
+
+      <div style="display:flex; gap:1.25rem; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap;">
+        {% if station_qr %}
+          <div style="background:#FFFFFF; padding:0.6rem; border-radius:10px; border:1px solid var(--color-border); line-height:0;">
+            <img src="{{ url_for('public.station_qr_image', token=station_qr.qr_token) }}" alt="Station QR Code" style="width:108px; height:108px; display:block;">
+          </div>
+          <div style="flex:1; min-width:180px; font-size:0.84rem;">
+            <div style="font-weight:700; color:var(--accent-cyan); margin-bottom:0.25rem;">
+              Station Placard QR
+            </div>
+            <div style="font-family:monospace; font-size:0.78rem; color:var(--text-dim); margin-bottom:0.4rem;">
+              Token: {{ station_qr.qr_token }}
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-dim); line-height:1.4;">
+              Scan at site with the in-app scanner to pre-select this station and unlock dispensers immediately.
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Specs Table -->
+      <div style="border-top:1px solid var(--color-border); padding-top:0.85rem; display:grid; grid-template-columns:1fr 1fr; gap:0.65rem 1rem; font-size:0.84rem;">
+        <div><strong style="color:var(--text-dim);">Operator:</strong> {{ station.operator_name }}</div>
+        <div><strong style="color:var(--text-dim);">Station Status:</strong> <span class="badge badge-success">{{ station.station_status }}</span></div>
+        <div><strong style="color:var(--text-dim);">Connector Types:</strong> {{ station.connector_types or 'CCS2, Type 2' }}</div>
+        <div><strong style="color:var(--text-dim);">Dispensers Configured:</strong> {{ points|length }} Bays</div>
+        <div><strong style="color:var(--text-dim);">Source Register:</strong> {{ station.source_name or 'Tata Power Official Reference' }}</div>
+        <div><strong style="color:var(--text-dim);">License:</strong> {{ station.data_license or station.license_info or 'Public Reference' }}</div>
+      </div>
+    </div>
+
+    <!-- Academic Disclaimer Box -->
+    <div style="margin-top:1rem; padding:0.7rem 0.9rem; border-radius:6px; background:rgba(0,200,255,0.04); border:1px solid rgba(0,200,255,0.18); font-size:0.78rem; color:var(--text-dim); line-height:1.45;">
+      ℹ️ <strong>Demonstration Notice:</strong> Bay availability and tariffs operate under DBMS capstone database management. Slot reservations do not operate physical high-voltage switchgear.
+    </div>
+  </div>
+</div>
+
+<!-- Section: Available Charging Dispensers & Vehicle Compatibility -->
+<div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+  <div>
+    <h2 style="margin:0 0 0.2rem 0; font-size:1.35rem;">Configured Charging Dispensers ({{ points|length }})</h2>
+    <p style="margin:0; font-size:0.85rem; color:var(--text-dim);">
+      Select an available bay below to check vehicle compatibility and reserve your charging slot.
+    </p>
+  </div>
+  <a href="{{ url_for('customer.payments') }}?tab=reserve&station_id={{ station.station_id }}" class="btn btn-primary btn-sm">
+    ⚡ 5-Step Reserve &amp; Pay Wizard &rarr;
+  </a>
+</div>
+
+{% if points %}
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1.25rem;">
+    {% for pt in points %}
+      <div class="card" style="display:flex; flex-direction:column; justify-content:space-between; border:1px solid var(--color-border); border-radius:12px; transition:border-color 0.2s ease;">
+        <div>
+          <!-- Bay Header -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+            <div>
+              <span style="font-size:0.75rem; text-transform:uppercase; color:var(--accent-cyan); font-weight:700;">Bay Dispenser</span>
+              <h3 style="margin:0.15rem 0 0 0; font-size:1.15rem; font-weight:800;">{{ pt.point_code }}</h3>
+            </div>
+            <span class="badge {% if pt.point_status == 'AVAILABLE' %}badge-success{% elif pt.point_status == 'OCCUPIED' %}badge-warning{% else %}badge-danger{% endif %}" style="font-size:0.75rem;">
+              {{ pt.point_status }}
+            </span>
+          </div>
+
+          <!-- Connector & Power Specs -->
+          <div style="background:rgba(255,255,255,0.02); border:1px solid var(--color-border); border-radius:8px; padding:0.75rem; margin-bottom:0.85rem; font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:var(--text-dim);">Plug Standard:</span>
+              <strong style="color:var(--color-text-primary);">{{ pt.connector_type }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:var(--text-dim);">Max Power Output:</span>
+              <strong style="color:var(--accent-cyan);">{{ pt.max_power_kw }} kW</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-dim);">Tariff Rate:</span>
+              <strong style="color:var(--accent-emerald);">₹{{ "%.2f"|format(pt.tariff_per_kwh) }} / kWh</strong>
+            </div>
+          </div>
+
+          <!-- Vehicle Compatibility Feedback -->
+          <div style="margin-bottom:1rem; font-size:0.8rem;">
+            {% if vehicles %}
+              {% if pt.compatible_vehicles %}
+                <div style="color:var(--accent-emerald); display:flex; align-items:center; gap:0.4rem;">
+                  <span>✅</span> <strong>Compatible with your garage:</strong>
+                </div>
+                <div style="color:var(--text-dim); font-size:0.76rem; margin-top:0.2rem; margin-left:1.3rem;">
+                  {{ pt.compatible_vehicles|join(', ') }}
+                </div>
+              {% else %}
+                <div style="color:#F59E0B; display:flex; align-items:center; gap:0.4rem;">
+                  <span>⚠️</span> <strong>Connector mismatch:</strong>
+                </div>
+                <div style="color:var(--text-dim); font-size:0.76rem; margin-top:0.2rem; margin-left:1.3rem;">
+                  Your registered vehicles have different connector standards.
+                </div>
+              {% endif %}
+            {% else %}
+              <div style="color:var(--text-dim); font-size:0.78rem;">
+                🚗 <a href="{{ url_for('customer.vehicles') }}" style="color:var(--accent-cyan);">Add a vehicle</a> to check compatibility automatically.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <div>
+          {% if pt.point_status == 'AVAILABLE' and station.station_status == 'ACTIVE' %}
+            <div style="display:flex; gap:0.5rem;">
+              <a href="{{ url_for('customer.payments') }}?tab=reserve&station_id={{ station.station_id }}&point_id={{ pt.point_id }}" class="btn btn-primary btn-sm" style="flex:1; text-align:center;">
+                ⚡ Reserve &amp; Pay
+              </a>
+              <a href="{{ url_for('customer.charging') }}?point_id={{ pt.point_id }}" class="btn btn-secondary btn-sm" title="Initiate simulated active charge">
+                🔋 Plug In
+              </a>
+            </div>
+          {% else %}
+            <button type="button" class="btn btn-secondary btn-sm btn-block" disabled style="opacity:0.6; cursor:not-allowed;">
+              Dispenser {{ pt.point_status }}
+            </button>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card text-center" style="padding:2.5rem 1rem;">
+    <div style="font-size:2rem; margin-bottom:0.5rem;">⚡</div>
+    <h3 style="margin:0 0 0.35rem 0;">No Dispensers Configured</h3>
+    <p style="font-size:0.85rem; color:var(--text-dim); margin:0;">
+      This charging location is registered in the database, but specific dispenser bays have not been assigned yet.
+    </p>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if is_coord_verified %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  var lat = {{ station.latitude }};
+  var lng = {{ station.longitude }};
+  var map = L.map("customerStationDetailMap", {
+    zoomControl: true,
+    scrollWheelZoom: false
+  }).setView([lat, lng], 14);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  var customIcon = L.divIcon({
+    className: "custom-station-pin",
+    html: '<div style="background:#00D6A0; width:16px; height:16px; border-radius:50%; border:2px solid #0B1220; box-shadow:0 0 10px #00D6A0;"></div>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+
+  L.marker([lat, lng], { icon: customIcon })
+    .addTo(map)
+    .bindPopup("<strong>{{ station.station_name|escape }}</strong><br>{{ station.address|escape }}")
+    .openPopup();
+});
+</script>
+{% endif %}
+{% endblock %}

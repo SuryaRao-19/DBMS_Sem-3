@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}Manage Charging Dispensers - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Charging Point Dispensers & Tariffs</h1>
+    <div class="page-subtitle">Configure connector hardware, maximum power capacities, and per-kWh tariff billing rates</div>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('addPointModal')">+ Add Dispenser</button>
+</div>
+
+<!-- Dispensers Table -->
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Dispenser Code</th>
+        <th>Station Location</th>
+        <th>Connector</th>
+        <th>Max Power</th>
+        <th>Tariff Rate</th>
+        <th>Operational Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in points %}
+        <tr>
+          <td>
+            <div style="font-weight: 800; font-size: 1rem; color: var(--accent-emerald);">{{ p.point_code }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">Point ID: #{{ p.point_id }}</div>
+          </td>
+          <td>
+            <div style="font-weight: 600;">{{ p.station_name }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">{{ p.city }}</div>
+          </td>
+          <td>
+            <span class="tech-chip">
+              {{ p.connector_type }}
+            </span>
+          </td>
+          <td><span style="font-weight: 700;">{{ p.max_power_kw }}</span> kW</td>
+          <td>
+            <span style="font-weight: 800; color: #34d399; font-size: 1.05rem;">₹{{ "%.2f"|format(p.tariff_per_kwh) }}</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">/ kWh</span>
+          </td>
+          <td>
+            <span class="badge badge-{{ p.point_status.lower() }}">{{ p.point_status }}</span>
+          </td>
+          <td>
+            <button class="btn btn-secondary btn-sm"
+                    data-id="{{ p.point_id }}"
+                    data-code="{{ p.point_code }}"
+                    data-connector="{{ p.connector_type }}"
+                    data-power="{{ p.max_power_kw }}"
+                    data-tariff="{{ p.tariff_per_kwh }}"
+                    data-status="{{ p.point_status }}"
+                    onclick="openEditPointModal(this)">
+              Configure Tariff
+            </button>
+          </td>
+        </tr>
+
+      {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--text-dim);">No charging points configured.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Add Point Modal -->
+<div id="addPointModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Add New Charging Point</h3>
+      <button class="modal-close" onclick="closeModal('addPointModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin.points') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Station Hub</label>
+        <select name="station_id" class="form-control" required>
+          {% for s in stations %}
+            <option value="{{ s.station_id }}">{{ s.station_name }} ({{ s.city }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Point Code (Identifier)</label>
+          <input type="text" name="point_code" class="form-control" placeholder="e.g. CP-03" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Connector Standard</label>
+          <select name="connector_type" class="form-control" required>
+            <option value="CCS2">CCS2 (DC Fast)</option>
+            <option value="TYPE2">TYPE2 (AC Standard)</option>
+            <option value="CHADEMO">CHADEMO (DC)</option>
+            <option value="GB_T">GB/T</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Max Power (kW)</label>
+          <input type="number" step="0.1" min="1" name="max_power_kw" class="form-control" placeholder="60.0" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tariff Rate (₹/kWh)</label>
+          <input type="number" step="0.01" min="0" name="tariff_per_kwh" class="form-control" placeholder="18.00" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Initial Status</label>
+        <select name="point_status" class="form-control">
+          <option value="AVAILABLE">AVAILABLE</option>
+          <option value="MAINTENANCE">MAINTENANCE</option>
+          <option value="UNAVAILABLE">UNAVAILABLE</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addPointModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Dispenser</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if point_qrs is defined and points %}
+<div class="card" style="margin-top: 1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.85rem;">
+    <h2 style="font-size:1.1rem; margin:0;"><i class="fa-solid fa-qrcode" style="color:#38bdf8;"></i> Charging Point Dispenser QRs</h2>
+    <span class="text-dim" style="font-size:0.78rem;">Dispenser identification stickers only (non-payment)</span>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Dispenser</th>
+          <th>Station</th>
+          <th>QR Status &amp; Scans</th>
+          <th>QR Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pt in points %}
+          {% set pq = point_qrs.get(pt.point_id) %}
+          <tr>
+            <td><strong>{{ pt.point_code }}</strong> ({{ pt.connector_type }} &bull; {{ "%.0f"|format(pt.max_power_kw) }} kW)</td>
+            <td>{{ pt.station_name }}</td>
+            <td style="font-size:0.82rem;">
+              {% if pq %}
+                <span class="badge {% if pq.qr_status == 'ACTIVE' %}bg-success{% else %}bg-danger{% endif %}">{{ pq.qr_status }}</span>
+                <strong style="margin-left:0.35rem;">{{ pq.scan_count }} scan(s)</strong>
+              {% else %}
+                <span class="text-dim">Auto-generated on PNG view</span>
+              {% endif %}
+            </td>
+            <td style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+              <a href="{{ url_for('admin.download_point_qr_png', point_id=pt.point_id) }}" target="_blank" class="btn btn-secondary btn-sm">PNG</a>
+              {% if pq %}
+                <a href="{{ url_for('public.scan_point_qr', token=pq.qr_token) }}" target="_blank" class="btn btn-secondary btn-sm">Scan View</a>
+              {% endif %}
+              <form method="POST" action="{{ url_for('admin.regenerate_point_qr_route', point_id=pt.point_id) }}" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-secondary btn-sm">Rotate Token</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Edit Point Modal -->
+<div id="editPointModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Configure Point & Tariff</h3>
+      <button class="modal-close" onclick="closeModal('editPointModal')">&times;</button>
+    </div>
+    <form id="editPointForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Point Code</label>
+          <input type="text" id="edit_point_code" name="point_code" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Connector Standard</label>
+          <select id="edit_connector_type" name="connector_type" class="form-control" required>
+            <option value="CCS2">CCS2</option>
+            <option value="TYPE2">TYPE2</option>
+            <option value="CHADEMO">CHADEMO</option>
+            <option value="GB_T">GB/T</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Max Power (kW)</label>
+          <input type="number" step="0.1" min="1" id="edit_max_power_kw" name="max_power_kw" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tariff Rate (₹/kWh)</label>
+          <input type="number" step="0.01" min="0" id="edit_tariff_per_kwh" name="tariff_per_kwh" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Operational Status</label>
+        <select id="edit_point_status" name="point_status" class="form-control">
+          <option value="AVAILABLE">AVAILABLE</option>
+          <option value="OCCUPIED">OCCUPIED</option>
+          <option value="MAINTENANCE">MAINTENANCE</option>
+          <option value="UNAVAILABLE">UNAVAILABLE</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editPointModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openEditPointModal(btn) {
+    const d = btn.dataset;
+    document.getElementById('editPointForm').action = '/admin/points/' + d.id + '/edit';
+    document.getElementById('edit_point_code').value = d.code;
+    document.getElementById('edit_connector_type').value = d.connector;
+    document.getElementById('edit_max_power_kw').value = d.power;
+    document.getElementById('edit_tariff_per_kwh').value = d.tariff;
+    document.getElementById('edit_point_status').value = d.status;
+    openModal('editPointModal');
+  }
+</script>
+{% endblock %}
+

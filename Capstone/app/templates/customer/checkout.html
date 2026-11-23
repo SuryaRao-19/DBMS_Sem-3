@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}Checkout — {% if is_booking %}Booking #{{ booking_id }}{% else %}Session #{{ ctx.session_id }}{% endif %} — EZ Charge Network Portal{% endblock %}
+
+{% block extra_head %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <a href="{% if is_booking %}{{ url_for('customer.bookings') }}{% else %}{{ url_for('customer.history') }}{% endif %}" style="font-size:0.85rem; color:var(--color-text-secondary); text-decoration:none;">
+    &larr; Return to {% if is_booking %}Bookings{% else %}Charging History{% endif %}
+  </a>
+  <h1 style="margin:0.35rem 0 0 0; font-size:1.75rem; font-weight:800; color:var(--color-text-primary);">
+    {% if is_booking %}Settle Booking Reservation #{{ booking_id }}{% else %}Settle Charging Session #{{ ctx.session_id }}{% endif %}
+  </h1>
+  <p class="page-subtitle" style="margin:0; color:var(--color-text-secondary); font-size:0.92rem;">
+    Razorpay Test Mode integration &mdash; choose online payment checkout or generate a dynamic single-use Payment QR.
+  </p>
+</div>
+
+<!-- Test Mode Banner -->
+<div style="padding:0.75rem 1.25rem; border-radius:10px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); margin-bottom:1.75rem; font-size:0.88rem; color:#FCD34D; display:flex; align-items:center; gap:0.6rem;">
+  <span style="font-size:1.2rem;">⚠️</span>
+  <div>
+    <strong>RAZORPAY TEST MODE DEMONSTRATION</strong> &mdash; No real bank accounts or credit cards will be billed. Key ID: <code>{{ key_id or 'rzp_test_TzJPc5w2bmzTx7' }}</code>.
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:2rem; align-items:start;">
+  <!-- Left Column: Invoice Breakdown -->
+  <div class="card" style="background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.75rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid var(--color-border);">
+      <h3 style="margin:0; font-size:1.15rem; font-weight:700;">Invoice Breakdown</h3>
+      <span class="badge badge-secondary">
+        {% if is_booking %}Reservation Advance{% else %}Completed Session{% endif %}
+      </span>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:0.65rem; font-size:0.9rem;">
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Reference ID:</span>
+        <strong style="color:var(--accent-cyan); font-family:monospace;">
+          {% if is_booking %}BK-{{ booking_id }}{% else %}SES-{{ ctx.session_id }}{% endif %}
+        </strong>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Charging Hub:</span>
+        <strong style="color:#F8FAFC;">{{ ctx.station_name }}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Location:</span>
+        <span style="color:#F8FAFC;">{{ ctx.city }}, {{ ctx.address }}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Dispenser:</span>
+        <span style="color:#F8FAFC;">{{ ctx.point_code }} ({{ ctx.connector_type }})</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Vehicle:</span>
+        <span style="color:#F8FAFC;">{{ ctx.make }} {{ ctx.model }} <span style="font-family:monospace; color:var(--accent-cyan);">({{ ctx.registration_no }})</span></span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Energy:</span>
+        <strong style="color:#00D6A0;">{{ "%.2f"|format(ctx.energy_kwh) }} kWh</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Tariff Rate:</span>
+        <span style="color:#F8FAFC;">₹{{ "%.2f"|format(ctx.tariff_per_kwh or 18.0) }} / kWh</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding-top:0.5rem; border-top:1px solid rgba(255,255,255,0.06);">
+        <span style="color:var(--color-text-secondary);">Base Amount:</span>
+        <span style="color:#F8FAFC;">₹{{ "%.2f"|format(ctx.breakdown.base_amount) }}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">GST (18% Included):</span>
+        <span style="color:#F8FAFC;">₹{{ "%.2f"|format(ctx.breakdown.tax_amount) }}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding-top:0.75rem; border-top:1px solid var(--color-border); font-size:1.3rem;">
+        <strong style="color:#F8FAFC;">Total Payable:</strong>
+        <strong style="color:#00D6A0;">₹{{ "%.2f"|format(ctx.breakdown.total_amount) }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Dual Payment Options (Tabbed) -->
+  <div class="card" style="background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.75rem;">
+    <!-- Tab Controls -->
+    <div style="display:flex; border-bottom:1px solid var(--color-border); margin-bottom:1.5rem; gap:0.5rem;">
+      <button type="button" id="tabOptionA" onclick="switchTab('A')" style="flex:1; padding:0.75rem; background:transparent; border:none; border-bottom:3px solid var(--accent-cyan); color:#F8FAFC; font-weight:700; font-size:0.92rem; cursor:pointer;">
+        Option A: Pay Online
+      </button>
+      <button type="button" id="tabOptionB" onclick="switchTab('B')" style="flex:1; padding:0.75rem; background:transparent; border:none; border-bottom:3px solid transparent; color:var(--color-text-secondary); font-weight:700; font-size:0.92rem; cursor:pointer;">
+        Option B: Scan &amp; Pay QR
+      </button>
+    </div>
+
+    <!-- Status Alert Box -->
+    <div id="checkoutStatus" style="display:none; padding:0.85rem; border-radius:8px; margin-bottom:1.25rem; font-size:0.88rem;"></div>
+
+    <!-- PANE A: Online Checkout -->
+    <div id="paneA">
+      <div class="form-group" style="margin-bottom:1.25rem;">
+        <label class="form-label" for="payMethod" style="font-weight:600; color:var(--color-text-secondary);">Preferred Payment Channel</label>
+        <select id="payMethod" class="form-control" style="background:#0B1220; border:1px solid var(--color-border); color:#F8FAFC; height:44px;">
+          <option value="UPI">UPI / QR (Razorpay Test)</option>
+          <option value="CREDIT_CARD">Credit Card (Test Mode)</option>
+          <option value="DEBIT_CARD">Debit Card (Test Mode)</option>
+          <option value="NET_BANKING">Net Banking (Test Mode)</option>
+        </select>
+      </div>
+
+      <button type="button" id="payBtn" class="btn btn-primary btn-block" style="padding:0.95rem; font-size:1rem; font-weight:700;" onclick="executeCheckout()">
+        Pay ₹{{ "%.2f"|format(ctx.breakdown.total_amount) }} via Razorpay Test Mode &rarr;
+      </button>
+
+      <div style="font-size:0.78rem; color:var(--color-text-secondary); margin-top:1rem; text-align:center;">
+        🔒 256-bit SSL encrypted. Server-side signature verified.
+      </div>
+    </div>
+
+    <!-- PANE B: Scan & Pay QR -->
+    <div id="paneB" style="display:none;">
+      <div style="text-align:center;">
+        <div style="font-size:0.85rem; color:var(--color-text-secondary); margin-bottom:1rem;">
+          Generate a single-use Dynamic UPI Payment QR code with a 10-minute expiry window.
+        </div>
+
+        <button type="button" id="genQrBtn" class="btn btn-secondary btn-block" style="padding:0.85rem;" onclick="generateQr()">
+          ⚡ Generate Dynamic Payment QR
+        </button>
+
+        <div id="qrDisplay" style="display:none; margin-top:1.25rem; padding:1.25rem; border-radius:10px; background:rgba(255,255,255,0.02); border:1px dashed var(--color-border);">
+          <img id="qrImage" src="" alt="Dynamic Payment QR" style="width:180px; height:180px; border-radius:10px; background:#fff; padding:8px; margin:0 auto; display:block; box-shadow:0 4px 14px rgba(0,0,0,0.4);">
+
+          <div id="qrTimer" style="font-size:0.85rem; font-weight:700; color:#00D6A0; margin-top:0.75rem;">
+            ⏳ Expires in 10:00
+          </div>
+
+          <!-- Clear Instructions -->
+          <div style="text-align:left; background:rgba(8,14,26,0.6); border:1px solid var(--color-border); border-radius:8px; padding:0.85rem 1rem; margin-top:1rem; font-size:0.82rem; color:var(--color-text-secondary);">
+            <strong style="color:#F8FAFC; display:block; margin-bottom:0.35rem;">How to Pay with UPI QR:</strong>
+            <ol style="margin:0; padding-left:1.2rem; line-height:1.5;">
+              <li>Open any UPI app (Google Pay, PhonePe, Paytm, BHIM).</li>
+              <li>Scan the displayed QR code.</li>
+              <li>Verify the merchant: <em>Tata Power EZ Charge Demo</em>.</li>
+              <li>Complete the ₹{{ "%.2f"|format(ctx.breakdown.total_amount) }} test transaction.</li>
+              <li>Click the button below to confirm test settlement.</li>
+            </ol>
+          </div>
+
+          <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+            <button type="button" class="btn btn-primary" style="flex:1;" onclick="completeQrPayment()">
+              I Have Paid &rarr; Verify Now
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="generateQr()" title="Refresh QR">
+              🔄 Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const SESSION_ID = {{ ctx.session_id|default('null') }};
+const BOOKING_ID = {{ booking_id|default('null') }};
+const KEY_ID = {{ key_id|tojson }};
+const HAS_SECRET = {{ 'true' if has_secret else 'false' }};
+let activeOrderId = null;
+let qrTimerInterval = null;
+
+function switchTab(tab) {
+  const btnA = document.getElementById('tabOptionA');
+  const btnB = document.getElementById('tabOptionB');
+  const paneA = document.getElementById('paneA');
+  const paneB = document.getElementById('paneB');
+
+  if (tab === 'A') {
+    btnA.style.borderBottomColor = 'var(--accent-cyan)';
+    btnA.style.color = '#F8FAFC';
+    btnB.style.borderBottomColor = 'transparent';
+    btnB.style.color = 'var(--color-text-secondary)';
+    paneA.style.display = 'block';
+    paneB.style.display = 'none';
+  } else {
+    btnB.style.borderBottomColor = 'var(--accent-cyan)';
+    btnB.style.color = '#F8FAFC';
+    btnA.style.borderBottomColor = 'transparent';
+    btnA.style.color = 'var(--color-text-secondary)';
+    paneA.style.display = 'none';
+    paneB.style.display = 'block';
+  }
+}
+
+function setStatus(msg, isSuccess) {
+  const box = document.getElementById('checkoutStatus');
+  box.style.display = 'block';
+  box.textContent = msg;
+  box.style.background = isSuccess ? 'rgba(0,214,160,0.1)' : 'rgba(244,63,94,0.1)';
+  box.style.color = isSuccess ? '#00D6A0' : '#FB7185';
+  box.style.border = `1px solid ${isSuccess ? 'rgba(0,214,160,0.3)' : 'rgba(244,63,94,0.3)'}`;
+}
+
+async function executeCheckout() {
+  const btn = document.getElementById('payBtn');
+  const method = document.getElementById('payMethod').value;
+  btn.disabled = true;
+  setStatus('Initializing Razorpay Test order on backend...', true);
+
+  try {
+    const payload = { payment_method: method };
+    if (SESSION_ID) payload.session_id = SESSION_ID;
+    if (BOOKING_ID) payload.booking_id = BOOKING_ID;
+
+    const orderRes = await csrfFetch('/api/payments/razorpay/create-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const orderData = await orderRes.json();
+    if (!orderRes.ok || !orderData.success) {
+      throw new Error(orderData.error || 'Failed to create Razorpay order.');
+    }
+
+    const order = orderData.order;
+    activeOrderId = order.order_id;
+
+    if (HAS_SECRET && KEY_ID && typeof Razorpay !== 'undefined') {
+      const options = {
+        key: KEY_ID,
+        amount: order.amount_paise,
+        currency: order.currency,
+        name: 'Tata Power EZ Charge Demo',
+        description: `TEST MODE — ${SESSION_ID ? 'Session #' + SESSION_ID : 'Booking #' + BOOKING_ID}`,
+        order_id: order.order_id,
+        prefill: {
+          name: {{ ctx.customer_name|tojson }},
+          email: {{ ctx.customer_email|tojson }}
+        },
+        theme: { color: '#06B6D4' },
+        handler: async function (resp) {
+          setStatus('Verifying cryptographic signature on server...', true);
+          const vPayload = {
+            razorpay_order_id: resp.razorpay_order_id,
+            razorpay_payment_id: resp.razorpay_payment_id,
+            razorpay_signature: resp.razorpay_signature,
+            payment_method: method,
+          };
+          if (SESSION_ID) vPayload.session_id = SESSION_ID;
+          if (BOOKING_ID) vPayload.booking_id = BOOKING_ID;
+
+          const vRes = await csrfFetch('/api/payments/razorpay/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(vPayload)
+          });
+          const vData = await vRes.json();
+          if (!vRes.ok || !vData.success) {
+            setStatus(vData.error || 'Signature check failed.', false);
+            btn.disabled = false;
+            return;
+          }
+          window.location.href = `/customer/payment-result/${vData.payment_id}`;
+        },
+        modal: {
+          ondismiss: function () {
+            setStatus('Payment dismissed by user.', false);
+            btn.disabled = false;
+          }
+        }
+      };
+      new Razorpay(options).open();
+    } else {
+      // Sandbox fallback simulator
+      setStatus(`Order ${order.order_id} created. Verifying test HMAC on server...`, true);
+      const sbPayload = {
+        razorpay_order_id: order.order_id,
+        payment_method: method,
+      };
+      if (SESSION_ID) sbPayload.session_id = SESSION_ID;
+      if (BOOKING_ID) sbPayload.booking_id = BOOKING_ID;
+
+      const sbRes = await csrfFetch('/api/payments/razorpay/sandbox-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sbPayload)
+      });
+      const sbData = await sbRes.json();
+      if (!sbRes.ok || !sbData.success) {
+        throw new Error(sbData.error || 'Sandbox settlement failed.');
+      }
+      setStatus(`Settled (${sbData.transaction_reference})! Redirecting...`, true);
+      setTimeout(() => {
+        window.location.href = `/customer/payment-result/${sbData.payment_id}`;
+      }, 500);
+    }
+  } catch (err) {
+    setStatus(err.message, false);
+    btn.disabled = false;
+  }
+}
+
+async function generateQr() {
+  const btn = document.getElementById('genQrBtn');
+  btn.disabled = true;
+  setStatus('Generating dynamic single-use Payment QR...', true);
+
+  try {
+    const payload = {};
+    if (SESSION_ID) payload.session_id = SESSION_ID;
+    if (BOOKING_ID) payload.booking_id = BOOKING_ID;
+
+    const res = await csrfFetch('/api/payments/razorpay/qr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error);
+
+    activeOrderId = data.qr.order_id;
+    document.getElementById('qrImage').src = data.qr.qr_image_data_uri;
+    document.getElementById('qrDisplay').style.display = 'block';
+    startQrCountdown(data.qr.ttl_seconds || 600);
+    setStatus('Dynamic Payment QR generated. Scan with any UPI app.', true);
+  } catch (e) {
+    setStatus(e.message || 'QR generation failed', false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function startQrCountdown(durationSec) {
+  if (qrTimerInterval) clearInterval(qrTimerInterval);
+  let remaining = durationSec;
+  const timerEl = document.getElementById('qrTimer');
+
+  qrTimerInterval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(qrTimerInterval);
+      timerEl.textContent = '❌ QR Expired. Please click Refresh.';
+      timerEl.style.color = '#F43F5E';
+      return;
+    }
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    timerEl.textContent = `⏳ Expires in ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }, 1000);
+}
+
+async function completeQrPayment() {
+  if (!activeOrderId) {
+    setStatus('Please generate a Payment QR first.', false);
+    return;
+  }
+  setStatus('Verifying test payment settlement on server...', true);
+
+  try {
+    const payload = {
+      razorpay_order_id: activeOrderId,
+      payment_method: 'UPI',
+    };
+    if (SESSION_ID) payload.session_id = SESSION_ID;
+    if (BOOKING_ID) payload.booking_id = BOOKING_ID;
+
+    const sbRes = await csrfFetch('/api/payments/razorpay/sandbox-complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const sbData = await sbRes.json();
+    if (!sbRes.ok || !sbData.success) {
+      throw new Error(sbData.error || 'Verification failed.');
+    }
+    setStatus(`Verified transaction ${sbData.transaction_reference}! Redirecting to receipt...`, true);
+    setTimeout(() => {
+      window.location.href = `/customer/payment-result/${sbData.payment_id}`;
+    }, 600);
+  } catch (err) {
+    setStatus(err.message, false);
+  }
+}
+</script>
+{% endblock %}

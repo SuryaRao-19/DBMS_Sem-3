@@ -1,0 +1,119 @@
+erDiagram
+    %% ============================================================
+    %% EV CHARGING STATION MANAGEMENT SYSTEM - ER DIAGRAM
+    %% DBMS Capstone Project | Normalized to 3NF
+    %% ============================================================
+
+    USERS ||--o{ VEHICLES : "owns / registers"
+    USERS ||--o{ BOOKINGS : "reserves slot"
+    USERS ||--o{ CHARGING_SESSIONS : "initiates"
+
+    STATIONS ||--|{ CHARGING_POINTS : "houses / operates"
+
+    CHARGING_POINTS ||--o{ BOOKINGS : "allocated for"
+    CHARGING_POINTS ||--o{ CHARGING_SESSIONS : "delivers energy at"
+
+    VEHICLES ||--o{ BOOKINGS : "assigned to"
+    VEHICLES ||--o{ CHARGING_SESSIONS : "receives charge"
+
+    BOOKINGS ||--o| CHARGING_SESSIONS : "triggers (optional 1:1)"
+    CHARGING_SESSIONS ||--o{ PAYMENTS : "billed via"
+    USERS ||--o{ AUDIT_LOGS : "logs actions of"
+
+    AUDIT_LOGS {
+        int log_id PK
+        int user_id FK "Users(user_id) Nullable"
+        string action "NOT NULL"
+        string entity_name "NOT NULL"
+        int entity_id "Nullable"
+        text details "Nullable"
+        string ip_address "Nullable"
+        timestamp created_at
+    }
+
+    SYSTEM_SETTINGS {
+        string setting_key PK
+        string setting_value "NOT NULL"
+        string description "Nullable"
+        timestamp updated_at
+    }
+
+    USERS {
+        int user_id PK
+        string full_name "NOT NULL"
+        string email UK "NOT NULL"
+        string phone
+        string password_hash "NOT NULL"
+        string role "ADMIN | OWNER"
+        string account_status "ACTIVE | INACTIVE"
+        timestamp created_at
+    }
+
+    VEHICLES {
+        int vehicle_id PK
+        int user_id FK "Users(user_id)"
+        string registration_no UK "NOT NULL"
+        string make "NOT NULL"
+        string model "NOT NULL"
+        decimal battery_capacity_kwh "CHECK > 0"
+        timestamp created_at
+    }
+
+    STATIONS {
+        int station_id PK
+        string station_name "NOT NULL"
+        string address "NOT NULL"
+        string city "NOT NULL"
+        time opening_time
+        time closing_time
+        string station_status "ACTIVE | INACTIVE | MAINTENANCE"
+        timestamp created_at
+    }
+
+    CHARGING_POINTS {
+        int point_id PK
+        int station_id FK "Stations(station_id)"
+        string point_code "NOT NULL"
+        string connector_type "TYPE2 | CCS2 | CHADEMO | GB_T"
+        decimal max_power_kw "CHECK > 0"
+        decimal tariff_per_kwh "CHECK >= 0"
+        string point_status "AVAILABLE | OCCUPIED | UNAVAILABLE | MAINTENANCE"
+        timestamp created_at
+    }
+
+    BOOKINGS {
+        int booking_id PK
+        int user_id FK "Users(user_id)"
+        int vehicle_id FK "Vehicles(vehicle_id)"
+        int point_id FK "ChargingPoints(point_id)"
+        datetime start_at "NOT NULL"
+        datetime end_at "CHECK end_at > start_at"
+        string booking_status "PENDING | CONFIRMED | CANCELLED | COMPLETED"
+        timestamp created_at
+    }
+
+    CHARGING_SESSIONS {
+        int session_id PK
+        int booking_id FK "Bookings(booking_id) UK (Nullable)"
+        int user_id FK "Users(user_id)"
+        int vehicle_id FK "Vehicles(vehicle_id)"
+        int point_id FK "ChargingPoints(point_id)"
+        datetime start_at "NOT NULL"
+        datetime end_at "CHECK end_at >= start_at"
+        decimal energy_kwh "CHECK >= 0"
+        decimal tariff_per_kwh "CHECK >= 0"
+        decimal total_cost "CHECK >= 0"
+        string session_status "IN_PROGRESS | COMPLETED | CANCELLED"
+        timestamp created_at
+    }
+
+    PAYMENTS {
+        int payment_id PK
+        int session_id FK "ChargingSessions(session_id)"
+        string transaction_reference UK "NOT NULL"
+        decimal amount "CHECK >= 0"
+        string payment_method "UPI | CARD | CASH | WALLET"
+        string payment_status "PENDING | SUCCESS | FAILED | REFUNDED"
+        datetime paid_at
+        timestamp created_at
+    }

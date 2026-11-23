@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Edit Station Settings — {{ station.station_name }} — Partner Console{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <a href="{{ url_for('owner.stations') }}" style="font-size:0.85rem; color:var(--text-dim); text-decoration:none;">&larr; Back to My Stations</a>
+  <h1 style="margin:0.35rem 0 0 0;">Configure Station: {{ station.station_name }}</h1>
+  <p class="page-subtitle" style="margin:0;">
+    Update operational parameters, customer contact numbers, and operational status.
+  </p>
+</div>
+
+<div class="card" style="max-width:600px; padding:2rem;">
+  <form method="POST" action="{{ url_for('owner.station_edit', station_id=station.station_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="form-group">
+      <label class="form-label" for="station_name_disp">Station Name</label>
+      <input type="text" id="station_name_disp" class="form-control" value="{{ station.station_name }}" disabled style="opacity:0.75;">
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.25rem;">Official name is managed by platform administration.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="address">Address / Landmark</label>
+      <input type="text" id="address" name="address" class="form-control" value="{{ station.address }}" required>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="operating_hours">Operating Hours Notes</label>
+      <input type="text" id="operating_hours" name="operating_hours" class="form-control" value="{{ station.operating_hours or 'Open 24 Hours' }}" placeholder="e.g. Open 24/7 or 06:00 - 23:00">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="contact_phone">On-Site Help Phone</label>
+      <input type="tel" id="contact_phone" name="contact_phone" class="form-control" value="{{ station.contact_phone or '' }}" placeholder="+91 98765 43210">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="station_status">Operational Status</label>
+      <select id="station_status" name="station_status" class="form-control">
+        <option value="ACTIVE" {% if station.station_status == 'ACTIVE' %}selected{% endif %}>ACTIVE — Accepting Drivers &amp; Bookings</option>
+        <option value="INACTIVE" {% if station.station_status == 'INACTIVE' %}selected{% endif %}>INACTIVE — Offline / Private</option>
+        <option value="MAINTENANCE" {% if station.station_status == 'MAINTENANCE' %}selected{% endif %}>MAINTENANCE — Temporary Hub Service</option>
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block" style="margin-top:1.25rem;">
+      Save Station Settings
+    </button>
+  </form>
+</div>
+{% endblock %}
+

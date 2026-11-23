@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="description" content="{% block meta_description %}EZ Charge Network Portal (EV ChargeNet): Independent Academic Demonstration using publicly available Tata Power EZ Charge reference information, verified station map, QR workflow, and Razorpay Test Mode billing.{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}EZ Charge Network Portal — Tata Power EZ Charge Reference Demo{% endblock %}">
+  <meta property="og:description" content="Explore verified Tata Power EZ Charge stations, interactive Google Maps / Leaflet discovery, station QR codes, demo slot reservations, and Razorpay Test Mode checkout.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="{{ url_for('static', filename='images/hero-ev-charging.jpg') }}">
+  <title>{% block title %}EZ Charge Network Portal — Tata Power EZ Charge Reference Demo (EV ChargeNet){% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/logo.svg') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        document.documentElement.classList.add('sidebar-preload');
+        if (localStorage.getItem('ev_sidebar_collapsed') === '1' && window.innerWidth > 1120) {
+          document.documentElement.classList.add('sidebar-is-collapsed');
+        }
+      } catch (e) { /* storage disabled */ }
+    })();
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+{% set auth_role = 'CUSTOMER' if session.get('role') == 'USER' else (session.get('role') or '') %}
+<body class="{% if session.get('user_id') %}has-admin-sidebar has-authenticated-sidebar has-{{ auth_role|lower }}-sidebar{% endif %}">
+
+{% if session.get('user_id') %}
+  <div class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+  <div class="admin-shell">
+
+    {# ====================================================================== #}
+    {# 1. ADMIN SIDEBAR SHELL                                                 #}
+    {# ====================================================================== #}
+    {% if auth_role == 'ADMIN' %}
+      <aside class="admin-sidebar" id="adminSidebar" aria-label="Admin Navigation">
+        <div class="admin-sidebar-brand">
+          <a href="{{ url_for('admin.dashboard') }}" class="nav-brand">
+            <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="EZ Charge Portal Logo" width="34" height="34" style="border-radius:8px; flex-shrink:0;">
+            <span class="nav-brand-text">
+              <span class="nav-brand-title">EZ Charge Portal</span>
+              <span class="nav-brand-sub">Platform Admin</span>
+            </span>
+          </a>
+        </div>
+
+        <nav class="admin-sidebar-nav" aria-label="Sidebar Sections">
+          <div>
+            <div class="sidebar-group-label">Overview</div>
+            <a href="{{ url_for('admin.dashboard') }}" data-tooltip="Dashboard" title="Dashboard" class="sidebar-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📊</span><span class="sidebar-label">Dashboard</span>
+            </a>
+          </div>
+
+          <div>
+            <div class="sidebar-group-label">Charging Network</div>
+            <a href="{{ url_for('admin.stations') }}" data-tooltip="Stations" title="Stations" class="sidebar-link {% if request.endpoint == 'admin.stations' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📍</span><span class="sidebar-label">Stations</span>
+            </a>
+            <a href="{{ url_for('admin.points') }}" data-tooltip="Dispensers" title="Dispensers" class="sidebar-link {% if request.endpoint == 'admin.points' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">⚡</span><span class="sidebar-label">Dispensers</span>
+            </a>
+          </div>
+
+          <div>
+            <div class="sidebar-group-label">Operations</div>
+            <a href="{{ url_for('admin.bookings') }}" data-tooltip="Bookings" title="Bookings" class="sidebar-link {% if request.endpoint == 'admin.bookings' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📅</span><span class="sidebar-label">Bookings</span>
+            </a>
+            <a href="{{ url_for('admin.sessions') }}" data-tooltip="Sessions" title="Sessions" class="sidebar-link {% if request.endpoint == 'admin.sessions' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">🔋</span><span class="sidebar-label">Sessions</span>
+            </a>
+          </div>
+
+          <div>
+            <div class="sidebar-group-label">Finance</div>
+            <a href="{{ url_for('admin.payments') }}" data-tooltip="Payments" title="Payments" class="sidebar-link {% if request.endpoint == 'admin.payments' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">💳</span><span class="sidebar-label">Payments</span>
+            </a>
+          </div>
+
+          <div>
+            <div class="sidebar-group-label">Management</div>
+            <a href="{{ url_for('admin.users') }}" data-tooltip="Users" title="Users" class="sidebar-link {% if request.endpoint in ('admin.users', 'admin.user_detail') %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">👥</span><span class="sidebar-label">Users</span>
+            </a>
+            <a href="{{ url_for('admin.owner_applications') }}" data-tooltip="Partner Applications" title="Partner Applications" class="sidebar-link {% if request.endpoint == 'admin.owner_applications' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📋</span><span class="sidebar-label">Partner Apps</span>
+            </a>
+            <a href="{{ url_for('admin.enquiries') }}" data-tooltip="Enquiries" title="Enquiries" class="sidebar-link {% if request.endpoint == 'admin.enquiries' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">✉️</span><span class="sidebar-label">Enquiries</span>
+            </a>
+          </div>
+
+          <div>
+            <div class="sidebar-group-label">Analytics &amp; System</div>
+            <a href="{{ url_for('admin.reports') }}" data-tooltip="Reports" title="Reports" class="sidebar-link {% if request.endpoint == 'admin.reports' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📈</span><span class="sidebar-label">Reports</span>
+            </a>
+            <a href="{{ url_for('admin.admin_data_sources') }}" data-tooltip="Data Sources" title="Data Sources" class="sidebar-link {% if request.endpoint == 'admin.admin_data_sources' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📚</span><span class="sidebar-label">Data Sources</span>
+            </a>
+            <a href="{{ url_for('admin.audit_logs') }}" data-tooltip="Audit Logs" title="Audit Logs" class="sidebar-link {% if request.endpoint == 'admin.audit_logs' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">🧾</span><span class="sidebar-label">Audit Logs</span>
+            </a>
+            <a href="{{ url_for('admin.system_health') }}" data-tooltip="System Health" title="System Health" class="sidebar-link {% if request.endpoint == 'admin.system_health' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">🛡️</span><span class="sidebar-label">System Health</span>
+            </a>
+          </div>
+
+          <div style="margin-top:auto; padding-top:0.5rem; border-top:1px solid rgba(226,232,240,0.1);">
+            <div class="sidebar-group-label">Account</div>
+            <a href="{{ url_for('public.profile') }}" data-tooltip="Profile" title="Profile" class="sidebar-link {% if request.endpoint == 'public.profile' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">👤</span><span class="sidebar-label">Profile</span>
+            </a>
+            <a href="{{ url_for('auth.logout') }}" data-tooltip="Logout" title="Logout" class="sidebar-link sidebar-link-logout">
+              <span class="sidebar-icon" aria-hidden="true">🚪</span><span class="sidebar-label">Logout</span>
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+    {# ====================================================================== #}
+    {# 2. CUSTOMER SIDEBAR SHELL (13 Links)                                   #}
+    {# ====================================================================== #}
+    {% elif auth_role == 'CUSTOMER' %}
+      <aside class="admin-sidebar" id="adminSidebar" aria-label="Customer Navigation">
+        <div class="admin-sidebar-brand">
+          <a href="{{ url_for('customer.dashboard') }}" class="nav-brand">
+            <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="EZ Charge Portal Logo" width="34" height="34" style="border-radius:8px; flex-shrink:0;">
+            <span class="nav-brand-text">
+              <span class="nav-brand-title">EZ Charge Portal</span>
+              <span class="nav-brand-sub">Customer Mobility</span>
+            </span>
+          </a>
+        </div>
+
+        <nav class="admin-sidebar-nav" aria-label="Customer Mobility Links">
+          <div>
+            <div class="sidebar-group-label">My Mobility</div>
+            <a href="{{ url_for('customer.dashboard') }}" data-tooltip="Overview" title="Overview" class="sidebar-link {% if request.endpoint == 'customer.dashboard' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📊</span><span class="sidebar-label">1. Overview</span>
+            </a>
+            <a href="{{ url_for('customer.stations') }}" data-tooltip="Find Stations" title="Find Stations" class="sidebar-link {% if request.endpoint == 'customer.stations' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">🔍</span><span class="sidebar-label">2. Find Stations</span>
+            </a>
+            <a href="{{ url_for('customer.vehicles') }}" data-tooltip="My Vehicles" title="My Vehicles" class="sidebar-link {% if request.endpoint == 'customer.vehicles' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">🚗</span><span class="sidebar-label">3. My Vehicles</span>
+            </a>
+            <a href="{{ url_for('customer.bookings') }}" data-tooltip="My Bookings" title="My Bookings" class="sidebar-link {% if request.endpoint in ('customer.bookings', 'customer.book_slot') %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📅</span><span class="sidebar-label">4. My Bookings</span>
+            </a>
+            <a href="{{ url_for('customer.charging') }}" data-tooltip="Active Charging" title="Active Charging" class="sidebar-link {% if request.endpoint == 'customer.charging' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">⚡</span><span class="sidebar-label">5. Active Charging</span>
+            </a>
+            <a href="{{ url_for('customer.history') }}" data-tooltip="Charging History" title="Charging History" class="sidebar-link {% if request.endpoint in ('customer.history', 'customer.session_detail') %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📜</span><span class="sidebar-label">6. Charging History</span>
+            </a>
+            <a href="{{ url_for('customer.payments') }}" data-tooltip="Payments &amp; Booking" title="Payments &amp; Booking" class="sidebar-link {% if request.endpoint in ('customer.payments', 'customer.checkout', 'customer.payment_result') %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">💳</span><span class="sidebar-label">7. Payments &amp; Booking</span>
+            </a>
+            <a href="{{ url_for('customer.qr_scanner') }}" data-tooltip="QR Scanner" title="QR Scanner" class="sidebar-link {% if request.endpoint == 'customer.qr_scanner' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📷</span><span class="sidebar-label">8. QR Scanner</span>
+            </a>
+            <a href="{{ url_for('customer.saved_stations') }}" data-tooltip="Saved Stations" title="Saved Stations" class="sidebar-link {% if request.endpoint == 'customer.saved_stations' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">⭐</span><span class="sidebar-label">9. Saved Stations</span>
+            </a>
+            <a href="{{ url_for('customer.notifications') }}" data-tooltip="Notifications" title="Notifications" class="sidebar-link {% if request.endpoint == 'customer.notifications' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">🔔</span><span class="sidebar-label">10. Notifications</span>
+            </a>
+          </div>
+
+          <div style="margin-top:auto; padding-top:0.5rem; border-top:1px solid rgba(226,232,240,0.1);">
+            <div class="sidebar-group-label">Account &amp; Help</div>
+            <a href="{{ url_for('customer.profile') }}" data-tooltip="My Profile" title="My Profile" class="sidebar-link {% if request.endpoint == 'customer.profile' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">👤</span><span class="sidebar-label">11. My Profile</span>
+            </a>
+            <a href="{{ url_for('customer.support') }}" data-tooltip="Help &amp; Support" title="Help &amp; Support" class="sidebar-link {% if request.endpoint == 'customer.support' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">💬</span><span class="sidebar-label">12. Help &amp; Support</span>
+            </a>
+            <a href="{{ url_for('auth.logout') }}" data-tooltip="Logout" title="Logout" class="sidebar-link sidebar-link-logout">
+              <span class="sidebar-icon" aria-hidden="true">🚪</span><span class="sidebar-label">13. Logout</span>
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+    {# ====================================================================== #}
+    {# 3. STATION PARTNER (OWNER) SIDEBAR SHELL                               #}
+    {# ====================================================================== #}
+    {% else %}
+      <aside class="admin-sidebar" id="adminSidebar" aria-label="Station Partner Navigation">
+        <div class="admin-sidebar-brand">
+          <a href="{{ url_for('owner.dashboard') }}" class="nav-brand">
+            <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="EZ Charge Portal Logo" width="34" height="34" style="border-radius:8px; flex-shrink:0;">
+            <span class="nav-brand-text">
+              <span class="nav-brand-title">EZ Charge Portal</span>
+              <span class="nav-brand-sub">Station Partner</span>
+            </span>
+          </a>
+        </div>
+
+        <nav class="admin-sidebar-nav" aria-label="Station Partner Links">
+          <div>
+            <div class="sidebar-group-label">Partner Operations</div>
+            <a href="{{ url_for('owner.dashboard') }}" data-tooltip="Dashboard" title="Dashboard" class="sidebar-link {% if request.endpoint == 'owner.dashboard' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📊</span><span class="sidebar-label">Overview</span>
+            </a>
+            <a href="{{ url_for('owner.stations') }}" data-tooltip="My Stations" title="My Stations" class="sidebar-link {% if request.endpoint in ('owner.stations', 'owner.station_edit') %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📍</span><span class="sidebar-label">My Stations</span>
+            </a>
+            <a href="{{ url_for('owner.points') }}" data-tooltip="Dispensers &amp; Tariffs" title="Dispensers &amp; Tariffs" class="sidebar-link {% if request.endpoint == 'owner.points' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">⚡</span><span class="sidebar-label">Dispensers</span>
+            </a>
+            <a href="{{ url_for('owner.bookings') }}" data-tooltip="Station Bookings" title="Station Bookings" class="sidebar-link {% if request.endpoint == 'owner.bookings' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">📅</span><span class="sidebar-label">Bookings</span>
+            </a>
+            <a href="{{ url_for('owner.sessions') }}" data-tooltip="Charging Telemetry" title="Charging Telemetry" class="sidebar-link {% if request.endpoint == 'owner.sessions' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">🔋</span><span class="sidebar-label">Sessions</span>
+            </a>
+          </div>
+
+          <div style="margin-top:auto; padding-top:0.5rem; border-top:1px solid rgba(226,232,240,0.1);">
+            <div class="sidebar-group-label">Account</div>
+            <a href="{{ url_for('public.profile') }}" data-tooltip="Partner Profile" title="Partner Profile" class="sidebar-link {% if request.endpoint == 'public.profile' %}active{% endif %}">
+              <span class="sidebar-icon" aria-hidden="true">👤</span><span class="sidebar-label">Profile</span>
+            </a>
+            <a href="{{ url_for('auth.logout') }}" data-tooltip="Logout" title="Logout" class="sidebar-link sidebar-link-logout">
+              <span class="sidebar-icon" aria-hidden="true">🚪</span><span class="sidebar-label">Logout</span>
+            </a>
+          </div>
+        </nav>
+      </aside>
+    {% endif %}
+
+    {# ====================================================================== #}
+    {# AUTHENTICATED WORKSPACE & TOPBAR                                       #}
+    {# ====================================================================== #}
+    <div class="admin-workspace">
+      <header class="admin-topbar">
+        <div class="topbar-left">
+          <button type="button" class="sidebar-toggle-btn" onclick="toggleAdminSidebar()" aria-label="Toggle Sidebar">&#9776;</button>
+          <div class="topbar-title-group">
+            <nav class="breadcrumb-trail" aria-label="Breadcrumb">
+              <a href="{{ url_for('customer.dashboard') if auth_role == 'CUSTOMER' else (url_for('owner.dashboard') if auth_role == 'OWNER' else url_for('admin.dashboard')) }}">
+                EZ Charge Network Portal
+              </a>
+              <span aria-hidden="true">/</span>
+              <span>{{ auth_role|capitalize }} Workspace</span>
+            </nav>
+            <div class="topbar-page-title">
+              {% if auth_role == 'CUSTOMER' %}
+                Customer Mobility Portal
+              {% elif auth_role == 'OWNER' %}
+                Station Partner Console
+              {% else %}
+                Platform Operations Admin
+              {% endif %}
+              <span class="demo-env-tag">Tata Power EZ Charge Reference Demo</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          {% if auth_role == 'CUSTOMER' %}
+            <a href="{{ url_for('customer.qr_scanner') }}" class="btn btn-sm btn-secondary hide-xs" style="display:inline-flex; align-items:center; gap:0.35rem;">
+              <span>📷</span> Scan QR
+            </a>
+            <a href="{{ url_for('customer.notifications') }}" class="notif-btn" title="In-App Notifications" aria-label="Notifications">
+              <span aria-hidden="true">🔔</span>
+            </a>
+          {% elif auth_role == 'ADMIN' %}
+            <a href="{{ url_for('admin.enquiries') }}" class="notif-btn" title="Enquiries &amp; Alerts" aria-label="Enquiries and Alerts">
+              <span aria-hidden="true">🔔</span>
+            </a>
+          {% endif %}
+
+          <div class="profile-menu-wrap">
+            <button type="button" class="user-badge" onclick="toggleProfileMenu(this)" aria-label="Open Account Menu">
+              {% if session.get('profile_picture_url') %}
+                <img src="{{ session.get('profile_picture_url') }}" alt="Avatar" width="24" height="24" style="border-radius:50%; object-fit:cover;">
+              {% endif %}
+              <span class="hide-xs">{{ session.get('full_name') or 'User' }}</span>
+              <span class="role-pill {{ auth_role|lower }}">{{ auth_role }}</span>
+              <span style="font-size:0.68rem;">&#9662;</span>
+            </button>
+            <div class="profile-dropdown">
+              {% if auth_role == 'CUSTOMER' %}
+                <a href="{{ url_for('customer.profile') }}">My Profile</a>
+                <a href="{{ url_for('customer.vehicles') }}">My Vehicles</a>
+                <a href="{{ url_for('customer.bookings') }}">My Bookings</a>
+                <a href="{{ url_for('customer.history') }}">Charging History</a>
+                <a href="{{ url_for('customer.support') }}">Help &amp; Support</a>
+              {% elif auth_role == 'OWNER' %}
+                <a href="{{ url_for('public.profile') }}">Partner Profile</a>
+                <a href="{{ url_for('owner.stations') }}">My Stations</a>
+                <a href="{{ url_for('owner.points') }}">Dispensers</a>
+              {% else %}
+                <a href="{{ url_for('public.profile') }}">Account Profile</a>
+                <a href="{{ url_for('admin.users') }}">User Management</a>
+                <a href="{{ url_for('admin.owner_applications') }}">Partner Applications</a>
+              {% endif %}
+              <a href="{{ url_for('public.browse_stations') }}">Public Station Map</a>
+              <a href="{{ url_for('public.data_sources') }}">Data Source Register</a>
+              <a href="{{ url_for('auth.logout') }}" style="color:#FB7185;">Log Out</a>
+            </div>
+          </div>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger btn-sm hide-xs">Log Out</a>
+        </div>
+      </header>
+
+      <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">
+                <span>{{ message }}</span>
+                <button type="button" onclick="this.parentElement.remove()" style="background:transparent;border:none;color:inherit;cursor:pointer;font-size:1.1rem;">&times;</button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+{# ========================================================================== #}
+{# 4. PUBLIC VISITOR NAVIGATION (Unauthenticated)                             #}
+{# ========================================================================== #}
+{% else %}
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="{{ url_for('public.landing') }}" class="nav-brand">
+        <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="EZ Charge Network Portal Logo" width="34" height="34" style="border-radius:8px; flex-shrink:0;">
+        <span class="nav-brand-text">
+          <span class="nav-brand-title">EZ Charge Network Portal</span>
+          <span class="nav-brand-sub">Tata Power EZ Charge Reference Demo</span>
+        </span>
+      </a>
+
+      <button type="button" class="mobile-toggle" onclick="document.querySelector('.navbar .nav-menu').classList.toggle('open')" aria-label="Toggle Navigation">&#9776;</button>
+
+      <ul class="nav-menu">
+        <li><a href="{{ url_for('public.browse_stations') }}" class="nav-link {% if request.endpoint == 'public.browse_stations' %}active{% endif %}">Find Stations</a></li>
+        <li><a href="{{ url_for('public.about') }}" class="nav-link {% if request.endpoint == 'public.about' %}active{% endif %}">About Us</a></li>
+        <li><a href="{{ url_for('public.data_sources') }}" class="nav-link {% if request.endpoint == 'public.data_sources' %}active{% endif %}">Data Sources</a></li>
+        <li><a href="{{ url_for('owner.apply') }}" class="nav-link {% if request.endpoint == 'owner.apply' %}active{% endif %}">Become a Partner</a></li>
+        <li><a href="{{ url_for('public.contact') }}" class="nav-link {% if request.endpoint == 'public.contact' %}active{% endif %}">Contact Us</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-secondary btn-sm">Log In</a>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">Register</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">
+            <span>{{ message }}</span>
+            <button type="button" onclick="this.parentElement.remove()" style="background:transparent;border:none;color:inherit;cursor:pointer;font-size:1.1rem;">&times;</button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+{% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+{% if session.get('user_id') %}
+      <!-- Authenticated Footer (Customer, Owner & Admin Portals) -->
+      <footer class="footer" style="margin-top:auto; background:rgba(8,14,26,0.95); border-top:1px solid var(--color-border); padding:1.25rem 1.75rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; font-size:0.8rem; color:var(--text-dim);">
+          <div style="max-width:58ch;">
+            <strong>EZ Charge Network Portal</strong> &mdash; Independent Academic Demonstration based on publicly available Tata Power EZ Charge reference information.
+          </div>
+          <div style="display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap;">
+            <div style="display:flex; gap:0.9rem;">
+              <a href="{{ url_for('public.browse_stations') }}">Station Map</a>
+              <a href="{{ url_for('public.privacy') }}">Privacy</a>
+              <a href="{{ url_for('public.terms') }}">Terms</a>
+              <a href="https://www.tatapower.com/ezcharge" target="_blank" rel="noopener noreferrer">Official EZ Charge &nearr;</a>
+            </div>
+            <!-- Compact Official Social Icon Row -->
+            <div class="footer-social-strip" aria-label="Tata Power Official Social Media">
+              <a href="https://www.instagram.com/tatapowercompanyltd/" target="_blank" rel="noopener noreferrer" class="social-icon-btn instagram" aria-label="Visit Tata Power on Instagram (opens in new tab)" title="Instagram @tatapowercompanyltd">
+                <i class="fa-brands fa-instagram" aria-hidden="true"></i>
+              </a>
+              <a href="https://www.facebook.com/tatapower/" target="_blank" rel="noopener noreferrer" class="social-icon-btn facebook" aria-label="Visit Tata Power on Facebook (opens in new tab)" title="Facebook tatapower">
+                <i class="fa-brands fa-facebook-f" aria-hidden="true"></i>
+              </a>
+              <a href="https://x.com/tatapower" target="_blank" rel="noopener noreferrer" class="social-icon-btn x-twitter" aria-label="Visit Tata Power on X (opens in new tab)" title="X (Twitter) @tatapower">
+                <i class="fa-brands fa-x-twitter" aria-hidden="true"></i>
+              </a>
+              <a href="https://www.linkedin.com/company/tata-power/" target="_blank" rel="noopener noreferrer" class="social-icon-btn linkedin" aria-label="Visit Tata Power on LinkedIn (opens in new tab)" title="LinkedIn Tata Power">
+                <i class="fa-brands fa-linkedin-in" aria-hidden="true"></i>
+              </a>
+              <a href="https://www.youtube.com/channel/UCCz5pvnMkswgbWh5MKMH-vQ" target="_blank" rel="noopener noreferrer" class="social-icon-btn youtube" aria-label="Visit Tata Power on YouTube (opens in new tab)" title="YouTube @TataPowerCompanyLtd">
+                <i class="fa-brands fa-youtube" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div> <!-- /.admin-workspace -->
+  </div> <!-- /.admin-shell -->
+{% else %}
+  <footer class="footer">
+    <div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.25rem;">
+        <div style="max-width:60ch;">
+          <strong>EZ Charge Network Portal</strong> <span style="color:var(--accent-cyan);">(EV ChargeNet)</span> &mdash; Independent Academic Demonstration using publicly available Tata Power EZ Charge reference information.
+          <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: 0.35rem; line-height:1.5;">
+            Not an official Tata Power application and not authorized to access real charging hardware. Bookings, session metering, and Razorpay Test Mode billing operate strictly in demonstration mode with zero real financial transactions.
+          </div>
+        </div>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; align-items:center;">
+          <a href="{{ url_for('public.browse_stations') }}">Station Finder</a>
+          <a href="{{ url_for('owner.apply') }}">Partner With Us</a>
+          <a href="{{ url_for('public.about') }}">About Reference Network</a>
+          <a href="{{ url_for('public.data_sources') }}">Data Sources</a>
+          <a href="{{ url_for('public.contact') }}">Contact</a>
+          <a href="{{ url_for('public.privacy') }}">Privacy Policy</a>
+          <a href="{{ url_for('public.terms') }}">Terms</a>
+          <a href="https://www.google.com/maps/search/Tata+Power+EZ+Charge+Delhi+NCR/" target="_blank" rel="noopener noreferrer">Google Maps &nearr;</a>
+          <a href="https://www.tatapower.com/ezcharge" target="_blank" rel="noopener noreferrer">Official EZ Charge &nearr;</a>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color);">
+        <span style="font-size: 0.76rem; color: var(--text-dim);">
+          Tata Power Official Reference Support:
+          {% if platform_operator %}{{ platform_operator.support_phone }} &bull; {{ platform_operator.support_email }}{% else %}1800 833 2233 &bull; evsupport@tatapower.com{% endif %}
+          &bull; <a href="https://www.tatapower.com/" target="_blank" rel="noopener noreferrer">Corporate Website &nearr;</a>
+          &bull; <a href="https://linktr.ee/Tata_Power_EZ_Charge" target="_blank" rel="noopener noreferrer">Official Linktree &nearr;</a>
+        </span>
+        <!-- Compact Official Social Icon Row -->
+        <div class="footer-social-strip" aria-label="Tata Power Official Social Media">
+          <a href="https://www.instagram.com/tatapowercompanyltd/" target="_blank" rel="noopener noreferrer" class="social-icon-btn instagram" aria-label="Visit Tata Power on Instagram (opens in new tab)" title="Instagram @tatapowercompanyltd">
+            <i class="fa-brands fa-instagram" aria-hidden="true"></i>
+          </a>
+          <a href="https://www.facebook.com/tatapower/" target="_blank" rel="noopener noreferrer" class="social-icon-btn facebook" aria-label="Visit Tata Power on Facebook (opens in new tab)" title="Facebook tatapower">
+            <i class="fa-brands fa-facebook-f" aria-hidden="true"></i>
+          </a>
+          <a href="https://x.com/tatapower" target="_blank" rel="noopener noreferrer" class="social-icon-btn x-twitter" aria-label="Visit Tata Power on X (opens in new tab)" title="X (Twitter) @tatapower">
+            <i class="fa-brands fa-x-twitter" aria-hidden="true"></i>
+          </a>
+          <a href="https://www.linkedin.com/company/tata-power/" target="_blank" rel="noopener noreferrer" class="social-icon-btn linkedin" aria-label="Visit Tata Power on LinkedIn (opens in new tab)" title="LinkedIn Tata Power">
+            <i class="fa-brands fa-linkedin-in" aria-hidden="true"></i>
+          </a>
+          <a href="https://www.youtube.com/channel/UCCz5pvnMkswgbWh5MKMH-vQ" target="_blank" rel="noopener noreferrer" class="social-icon-btn youtube" aria-label="Visit Tata Power on YouTube (opens in new tab)" title="YouTube @TataPowerCompanyLtd">
+            <i class="fa-brands fa-youtube" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+{% endif %}
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

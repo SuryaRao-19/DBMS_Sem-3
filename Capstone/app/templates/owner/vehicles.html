@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}My Vehicles - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>My Registered Electric Vehicles</h1>
+    <div class="page-subtitle">Manage your electric vehicle profiles, license registrations, and battery capacities</div>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('addVehicleModal')">+ Register New Vehicle</button>
+</div>
+
+<!-- Vehicles Grid -->
+<div class="grid-cols-3">
+  {% for v in vehicles %}
+    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+          <div>
+            <h3 style="font-size: 1.25rem;">{{ v.make }} {{ v.model }}</h3>
+            <span style="font-family: monospace; font-size: 0.9rem; color: var(--accent-cyan); font-weight: 700; background: rgba(6, 182, 212, 0.1); padding: 0.15rem 0.5rem; border-radius: var(--radius-sm);">
+              {{ v.registration_no }}
+            </span>
+          </div>
+          <div style="background: rgba(16, 185, 129, 0.1); color: var(--accent-emerald); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+            🔋
+          </div>
+        </div>
+
+        <div style="margin: 1.25rem 0; padding: 0.75rem; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700;">Battery Pack Capacity</div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #fff;">
+            {{ v.battery_capacity_kwh }} <span style="font-size: 0.9rem; color: var(--text-muted);">kWh</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.85rem; margin-top: 0.5rem;">
+        <span style="font-size: 0.75rem; color: var(--text-dim);">Added on {{ v.created_at.strftime('%d %b %Y') if v.created_at else '' }}</span>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary btn-sm"
+                  data-id="{{ v.vehicle_id }}"
+                  data-reg="{{ v.registration_no }}"
+                  data-make="{{ v.make }}"
+                  data-model="{{ v.model }}"
+                  data-capacity="{{ v.battery_capacity_kwh }}"
+                  onclick="openEditVehicleModal(this)">
+            Edit
+          </button>
+          <form method="POST" action="{{ url_for('owner.remove_vehicle', vehicle_id=v.vehicle_id) }}" onsubmit="return confirm('Are you sure you want to remove this vehicle?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card" style="grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem;">
+      <div style="font-size: 3rem; margin-bottom: 0.5rem;">🚗</div>
+      <h3>No Vehicles Registered Yet</h3>
+      <p style="color: var(--text-muted); max-width: 400px; margin: 0.5rem auto 1.5rem;">
+        Add your electric vehicle profile to unlock station slot reservations and simulated charging sessions.
+      </p>
+      <button class="btn btn-primary" onclick="openModal('addVehicleModal')">+ Register First Vehicle</button>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Add Vehicle Modal -->
+<div id="addVehicleModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Register Electric Vehicle</h3>
+      <button class="modal-close" onclick="closeModal('addVehicleModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('owner.vehicles') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Registration / License Plate Number</label>
+        <input type="text" name="registration_no" class="form-control" placeholder="e.g. DL01EV9999" required autofocus>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Vehicle Make / Brand</label>
+          <input type="text" name="make" class="form-control" placeholder="e.g. Tata, MG, Hyundai" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vehicle Model</label>
+          <input type="text" name="model" class="form-control" placeholder="e.g. Nexon EV, ZS EV, Ioniq 5" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Battery Capacity (kWh)</label>
+        <input type="number" step="0.1" min="1" max="250" name="battery_capacity_kwh" class="form-control" placeholder="e.g. 40.5" required>
+        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.35rem;">Used to model charging power limits and battery charge states.</div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addVehicleModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Vehicle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Vehicle Modal -->
+<div id="editVehicleModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit Vehicle Specifications</h3>
+      <button class="modal-close" onclick="closeModal('editVehicleModal')">&times;</button>
+    </div>
+    <form id="editVehicleForm" method="POST" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Registration / License Plate Number</label>
+        <input type="text" id="edit_reg_no" name="registration_no" class="form-control" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Vehicle Make / Brand</label>
+          <input type="text" id="edit_make" name="make" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vehicle Model</label>
+          <input type="text" id="edit_model" name="model" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Battery Capacity (kWh)</label>
+        <input type="number" step="0.1" min="1" max="250" id="edit_capacity" name="battery_capacity_kwh" class="form-control" required>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editVehicleModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update Vehicle</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openEditVehicleModal(btn) {
+  const d = btn.dataset;
+  document.getElementById('edit_reg_no').value = d.reg;
+  document.getElementById('edit_make').value = d.make;
+  document.getElementById('edit_model').value = d.model;
+  document.getElementById('edit_capacity').value = d.capacity;
+  document.getElementById('editVehicleForm').action = "/owner/vehicles/" + d.id + "/edit";
+  openModal('editVehicleModal');
+}
+</script>
+{% endblock %}
+

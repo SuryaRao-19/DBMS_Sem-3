@@ -1,0 +1,713 @@
+{% extends "base.html" %}
+{% block title %}Payments &amp; Booking — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header" style="margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0; font-size:1.75rem; font-weight:800; color:var(--color-text-primary);">
+      Payments &amp; Booking Center
+    </h1>
+    <p class="page-subtitle" style="margin:0; color:var(--color-text-secondary); font-size:0.92rem;">
+      Reserve charging slots, calculate tariffs with 18% GST breakdown, choose Online or Cash payment, and inspect official receipts.
+    </p>
+  </div>
+  <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+    <a href="{{ url_for('customer.history') }}" class="btn btn-secondary btn-sm">
+      <span>📜</span> Charging History
+    </a>
+    <a href="{{ url_for('customer.bookings') }}" class="btn btn-secondary btn-sm">
+      <span>📅</span> Active Bookings
+    </a>
+  </div>
+</div>
+
+<!-- Main Navigation Tabs: 1. Reserve & Pay vs 2. View Payments & Receipts -->
+<div style="display:flex; gap:0.75rem; margin-bottom:1.75rem; border-bottom:1px solid var(--color-border); padding-bottom:0.85rem; flex-wrap:wrap;">
+  <a href="{{ url_for('customer.payments', tab='reserve') }}"
+     class="btn {% if active_tab == 'reserve' %}btn-primary{% else %}btn-secondary{% endif %}"
+     style="display:inline-flex; align-items:center; gap:0.5rem; font-weight:700;">
+    <span>⚡</span> 1. Reserve &amp; Pay (5-Step Wizard)
+  </a>
+  <a href="{{ url_for('customer.payments', tab='ledger') }}"
+     class="btn {% if active_tab == 'ledger' %}btn-primary{% else %}btn-secondary{% endif %}"
+     style="display:inline-flex; align-items:center; gap:0.5rem; font-weight:700;">
+    <span>💳</span> 2. View Payments &amp; Receipts Ledger
+  </a>
+</div>
+
+{% if active_tab == 'reserve' %}
+<!-- ======================================================================== -->
+<!-- TAB 1: 5-STEP RESERVE & PAY WIZARD                                      -->
+<!-- ======================================================================== -->
+<div style="max-width:960px; margin:0 auto;">
+  <div class="card" style="padding:1.75rem; border:1px solid var(--color-border); border-radius:12px; background:var(--color-surface); margin-bottom:2rem;">
+    <div style="border-bottom:1px solid var(--color-border); padding-bottom:1rem; margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+      <div>
+        <h2 style="margin:0 0 0.25rem 0; font-size:1.35rem; font-weight:800;">Reserve Charger &amp; Select Payment</h2>
+        <p style="margin:0; font-size:0.85rem; color:var(--text-dim);">
+          Complete the 5 steps below to secure an EV charging dispenser with instant reservation locking.
+        </p>
+      </div>
+      <span class="badge badge-success" style="font-size:0.78rem;">Atomic Concurrency Safe</span>
+    </div>
+
+    <form method="POST" action="{{ url_for('customer.reserve_and_pay') }}" id="reservePayForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- STEP 1: SELECT STATION -->
+      <div style="margin-bottom:1.5rem; padding-bottom:1.5rem; border-bottom:1px solid var(--color-border);">
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+          <span style="background:var(--accent-cyan); color:#0B1220; width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem;">1</span>
+          <h3 style="margin:0; font-size:1.1rem;">Select Charging Station</h3>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-dim); margin:0 0 0.85rem 2rem;">
+          Choose an operational Tata Power EZ Charge or partner facility across Delhi NCR.
+        </p>
+
+        <div style="margin-left:2rem;">
+          <select id="wizardStationSelect" class="form-control" onchange="onStationChanged()" required>
+            <option value="">-- Choose Charging Station --</option>
+            {% for st in reserve_stations %}
+              <option value="{{ st.station_id }}" {% if pre_station_id == st.station_id %}selected{% endif %}>
+                {{ st.station_name }} &bull; {{ st.city }} ({{ st.operator_name or 'Tata Power EZ Charge' }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- STEP 2: SELECT DISPENSER & VEHICLE CHECK -->
+      <div style="margin-bottom:1.5rem; padding-bottom:1.5rem; border-bottom:1px solid var(--color-border);">
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+          <span style="background:var(--accent-cyan); color:#0B1220; width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem;">2</span>
+          <h3 style="margin:0; font-size:1.1rem;">Select Charging Dispenser &amp; Registered EV</h3>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-dim); margin:0 0 0.85rem 2rem;">
+          Pick an available connector bay. Compatibility with your registered vehicle will be checked automatically.
+        </p>
+
+        <div style="margin-left:2rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+          <!-- Dispenser Dropdown -->
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="wizardPointSelect">Charging Dispenser Bay <span style="color:var(--accent-rose)">*</span></label>
+            <select id="wizardPointSelect" name="point_id" class="form-control" onchange="onPointOrVehicleChanged()" required>
+              <option value="">-- Select Dispenser --</option>
+              {% for pt in available_points %}
+                <option value="{{ pt.point_id }}"
+                        data-station-id="{{ pt.station_id }}"
+                        data-connector="{{ pt.connector_type }}"
+                        data-power="{{ pt.max_power_kw }}"
+                        data-tariff="{{ pt.tariff_per_kwh }}"
+                        {% if pre_point_id == pt.point_id %}selected{% endif %}>
+                  {{ pt.point_code }} &mdash; {{ pt.connector_type }} ({{ pt.max_power_kw }} kW) &bull; ₹{{ "%.2f"|format(pt.tariff_per_kwh) }}/kWh
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Vehicle Dropdown -->
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="wizardVehicleSelect">My Registered EV <span style="color:var(--accent-rose)">*</span></label>
+            {% if user_vehicles %}
+              <select id="wizardVehicleSelect" name="vehicle_id" class="form-control" onchange="onPointOrVehicleChanged()" required>
+                {% for v in user_vehicles %}
+                  <option value="{{ v.vehicle_id }}"
+                          data-connector="{{ v.connector_type or 'CCS2' }}"
+                          data-battery="{{ v.battery_capacity_kwh or 50.0 }}"
+                          {% if v.is_default %}selected{% endif %}>
+                    {{ v.make }} {{ v.model }} ({{ v.registration_no }}) &mdash; {{ v.connector_type or 'CCS2' }}
+                  </option>
+                {% endfor %}
+              </select>
+            {% else %}
+              <div style="padding:0.65rem 0.85rem; border:1px solid rgba(245,158,11,0.3); border-radius:6px; background:rgba(245,158,11,0.08); font-size:0.82rem;">
+                ⚠️ No vehicles found in your garage. <a href="{{ url_for('customer.vehicles') }}" style="color:var(--accent-cyan); font-weight:700;">Add an EV</a> first.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Compatibility Feedback Badge -->
+        <div id="compatibilityBadge" style="margin-left:2rem; margin-top:0.75rem; font-size:0.84rem; display:none;"></div>
+      </div>
+
+      <!-- STEP 3: CHOOSE CHARGING REQUIREMENT & TIME SLOT -->
+      <div style="margin-bottom:1.5rem; padding-bottom:1.5rem; border-bottom:1px solid var(--color-border);">
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+          <span style="background:var(--accent-cyan); color:#0B1220; width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem;">3</span>
+          <h3 style="margin:0; font-size:1.1rem;">Choose Charging Requirement &amp; Schedule</h3>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-dim); margin:0 0 0.85rem 2rem;">
+          Specify when you plan to arrive and the estimated charging duration or energy required.
+        </p>
+
+        <div style="margin-left:2rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:1rem;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="wizardStartAt">Arrival Time Slot <span style="color:var(--accent-rose)">*</span></label>
+            <input type="datetime-local" id="wizardStartAt" name="start_at" class="form-control" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="wizardDuration">Charging Duration</label>
+            <select id="wizardDuration" name="duration_hours" class="form-control" onchange="onDurationOrKwhChanged()">
+              <option value="0.5">30 Minutes (Quick Top-Up)</option>
+              <option value="1.0" selected>1 Hour (Standard Fast Charge)</option>
+              <option value="1.5">1.5 Hours</option>
+              <option value="2.0">2 Hours (Full Pack Charge)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="wizardKwh">Estimated Energy (kWh)</label>
+            <input type="number" id="wizardKwh" name="estimated_kwh" class="form-control" value="20" min="5" max="150" step="1" oninput="recalcBill()">
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: SHOW PRICE BREAKDOWN -->
+      <div style="margin-bottom:1.5rem; padding-bottom:1.5rem; border-bottom:1px solid var(--color-border);">
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+          <span style="background:var(--accent-cyan); color:#0B1220; width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem;">4</span>
+          <h3 style="margin:0; font-size:1.1rem;">Tariff &amp; Price Breakdown</h3>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-dim); margin:0 0 0.85rem 2rem;">
+          Transparent calculation derived strictly from configured station dispenser tariff records.
+        </p>
+
+        <div style="margin-left:2rem; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); border-radius:10px; padding:1.25rem;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem 1rem; font-size:0.88rem; margin-bottom:0.85rem;">
+            <div style="color:var(--text-dim);">Energy Estimate:</div>
+            <div style="text-align:right; font-weight:700;"><span id="calcKwh">20.00</span> kWh</div>
+
+            <div style="color:var(--text-dim);">Dispenser Tariff Rate:</div>
+            <div style="text-align:right; font-weight:700;">₹<span id="calcRate">18.00</span> / kWh</div>
+
+            <div style="color:var(--text-dim);">Base Charging Amount:</div>
+            <div style="text-align:right; font-weight:700;">₹<span id="calcBase">360.00</span></div>
+
+            <div style="color:var(--text-dim);">Applicable GST (18% Included):</div>
+            <div style="text-align:right; font-weight:700; color:var(--text-dim);">₹<span id="calcTax">64.80</span></div>
+          </div>
+
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; display:flex; justify-content:space-between; align-items:center; font-size:1.15rem;">
+            <strong style="color:var(--color-text-primary);">Total Estimated Amount:</strong>
+            <strong style="color:var(--accent-emerald); font-size:1.35rem;">₹<span id="calcTotal">424.80</span></strong>
+          </div>
+
+          <div style="margin-top:0.75rem; font-size:0.76rem; color:var(--text-dim); line-height:1.4;">
+            ℹ️ <strong>Demonstration Tariff:</strong> Configured for academic DBMS testing. Final metered amount reflects actual kilowatt-hours delivered during the charging session.
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 5: CHOOSE PAYMENT METHOD -->
+      <div style="margin-bottom:2rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+          <span style="background:var(--accent-cyan); color:#0B1220; width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem;">5</span>
+          <h3 style="margin:0; font-size:1.1rem;">Choose Payment Method</h3>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-dim); margin:0 0 1rem 2rem;">
+          Choose whether to settle online via Razorpay Test Mode / BharatQR or offline in cash upon arrival.
+        </p>
+
+        <div style="margin-left:2rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+          <!-- Option A: Pay Online -->
+          <label style="border:2px solid var(--color-border); border-radius:10px; padding:1.15rem; display:block; cursor:pointer; background:rgba(255,255,255,0.02); transition:all 0.2s ease;" class="payment-method-card" id="payOnlineCard">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <input type="radio" name="payment_method" value="ONLINE" checked onchange="onPaymentMethodChanged()">
+                <strong style="font-size:1rem; color:var(--color-text-primary);">Option A: Pay Online</strong>
+              </div>
+              <span class="badge badge-success" style="font-size:0.7rem;">Instant Confirmation</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--text-dim); line-height:1.45;">
+              Razorpay Test Mode, UPI, Cards, NetBanking, and Dynamic BharatQR simulation. Confirms reservation immediately.
+            </div>
+          </label>
+
+          <!-- Option B: Pay Offline / Cash -->
+          <label style="border:2px solid var(--color-border); border-radius:10px; padding:1.15rem; display:block; cursor:pointer; background:rgba(255,255,255,0.02); transition:all 0.2s ease;" class="payment-method-card" id="payCashCard">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <input type="radio" name="payment_method" value="CASH" onchange="onPaymentMethodChanged()">
+                <strong style="font-size:1rem; color:var(--color-text-primary);">Option B: Pay at Station (Cash)</strong>
+              </div>
+              <span class="badge badge-warning" style="font-size:0.7rem;">Payment Due</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--text-dim); line-height:1.45;">
+              Reserves the bay in <code>PAYMENT_DUE</code> status. Pay exact cash to the station attendant upon arrival. Formal invoice issued after attendant confirms receipt.
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Submit Actions -->
+      <div style="margin-left:2rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+        <button type="submit" class="btn btn-primary" id="wizardSubmitBtn" style="height:48px; padding:0 2rem; font-size:1rem; font-weight:800;">
+          Confirm Reservation &amp; Proceed &rarr;
+        </button>
+        <span style="font-size:0.8rem; color:var(--text-dim);">
+          🔒 Double-booking protected via atomic row-level database serialization.
+        </span>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+<!-- ======================================================================== -->
+<!-- TAB 2: PAYMENTS & RECEIPTS TRANSACTION LEDGER                           -->
+<!-- ======================================================================== -->
+<!-- Summary Metric Cards -->
+<div class="customer-metrics-grid" style="margin-bottom:2rem;">
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Total Settled (Test Mode)</span>
+      <span class="stat-card-icon" style="background:rgba(0,214,160,0.12); color:#00D6A0;">💳</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value" style="color:#00D6A0;">₹{{ "%.2f"|format(summary.total_paid) }}</div>
+      <div class="stat-card-subtext">Verified &amp; captured payments</div>
+    </div>
+  </div>
+
+  <div class="stat-card cyan">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Successful Transactions</span>
+      <span class="stat-card-icon" style="background:rgba(0,200,255,0.12); color:#00C8FF;">🧾</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value">{{ summary.paid_count }}</div>
+      <div class="stat-card-subtext">Completed invoices</div>
+    </div>
+  </div>
+
+  <div class="stat-card amber">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Pending Transactions</span>
+      <span class="stat-card-icon" style="background:rgba(245,158,11,0.12); color:#F59E0B;">⏳</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value" style="color:#F59E0B;">{{ summary.pending_count or 0 }}</div>
+      <div class="stat-card-subtext">₹{{ "%.2f"|format(summary.total_pending) }} awaiting settlement</div>
+    </div>
+  </div>
+
+  <div class="stat-card indigo">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Total Invoices</span>
+      <span class="stat-card-icon" style="background:rgba(129,140,248,0.12); color:#818CF8;">📊</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value">{{ summary.total_tx }}</div>
+      <div class="stat-card-subtext">Lifetime transaction count</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card" style="margin-bottom:1.5rem; padding:1.25rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px;">
+  <form method="GET" action="{{ url_for('customer.payments') }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)) 100px; gap:0.85rem; align-items:end;">
+    <input type="hidden" name="tab" value="ledger">
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="paymentSearch" style="font-size:0.8rem; font-weight:600; color:var(--color-text-secondary);">Search</label>
+      <input type="text" id="paymentSearch" name="search" class="form-control" placeholder="Ref or station..." value="{{ search_query }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="paymentStatus" style="font-size:0.8rem; font-weight:600; color:var(--color-text-secondary);">Status</label>
+      <select id="paymentStatus" name="status" class="form-control">
+        <option value="">All Statuses</option>
+        <option value="SUCCESS" {% if selected_status == 'SUCCESS' %}selected{% endif %}>SUCCESS / Captured</option>
+        <option value="PAYMENT_DUE" {% if selected_status == 'PAYMENT_DUE' %}selected{% endif %}>PAYMENT_DUE (Cash)</option>
+        <option value="PENDING" {% if selected_status == 'PENDING' %}selected{% endif %}>PENDING</option>
+        <option value="FAILED" {% if selected_status == 'FAILED' %}selected{% endif %}>FAILED</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="startDate" style="font-size:0.8rem; font-weight:600; color:var(--color-text-secondary);">From Date</label>
+      <input type="date" id="startDate" name="start_date" class="form-control" value="{{ start_date }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="endDate" style="font-size:0.8rem; font-weight:600; color:var(--color-text-secondary);">To Date</label>
+      <input type="date" id="endDate" name="end_date" class="form-control" value="{{ end_date }}">
+    </div>
+
+    <div style="display:flex; gap:0.5rem;">
+      <button type="submit" class="btn btn-primary" style="height:42px; width:100%;">Filter</button>
+      {% if search_query or selected_status or start_date or end_date %}
+        <a href="{{ url_for('customer.payments', tab='ledger') }}" class="btn btn-secondary" style="height:42px; display:inline-flex; align-items:center; justify-content:center;" title="Reset">&times;</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Transactions Table Container -->
+<div class="card" style="padding:0; overflow:hidden; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; margin-bottom:2rem;">
+  <div style="padding:1rem 1.5rem; background:rgba(8,14,26,0.6); border-bottom:1px solid var(--color-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+    <div style="display:flex; align-items:center; gap:0.6rem;">
+      <h3 style="margin:0; font-size:1.05rem; font-weight:700;">Transaction History</h3>
+      <span style="font-size:0.8rem; color:var(--color-text-secondary);">({{ total_count }} total entries)</span>
+    </div>
+    <span class="badge badge-secondary" style="font-size:0.75rem;">Razorpay Test Mode Verified</span>
+  </div>
+
+  {% if payments %}
+    <div class="table-responsive">
+      <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--color-border); background:rgba(255,255,255,0.01);">
+            <th style="padding:0.9rem 1.25rem; text-align:left; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Transaction ID</th>
+            <th style="padding:0.9rem 1.25rem; text-align:left; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Reference</th>
+            <th style="padding:0.9rem 1.25rem; text-align:left; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Station Hub</th>
+            <th style="padding:0.9rem 1.25rem; text-align:left; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Payment Date</th>
+            <th style="padding:0.9rem 1.25rem; text-align:left; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Method</th>
+            <th style="padding:0.9rem 1.25rem; text-align:right; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Amount (₹)</th>
+            <th style="padding:0.9rem 1.25rem; text-align:center; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Status</th>
+            <th style="padding:0.9rem 1.25rem; text-align:right; font-size:0.8rem; text-transform:uppercase; color:var(--color-text-secondary);">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in payments %}
+            <tr style="border-bottom:1px solid var(--color-border); transition:background 0.1s ease;">
+              <td style="padding:0.85rem 1.25rem; font-family:monospace; font-size:0.82rem; color:var(--accent-cyan); font-weight:700;">
+                #{{ p.payment_id }}
+              </td>
+              <td style="padding:0.85rem 1.25rem; font-family:monospace; font-size:0.82rem; color:var(--color-text-primary);">
+                {{ p.transaction_reference or ('TXN-' ~ p.payment_id) }}
+                {% if p.booking_id %}
+                  <div style="font-size:0.72rem; color:var(--text-dim); font-family:sans-serif;">
+                    📅 Booking #{{ p.booking_id }}
+                  </div>
+                {% endif %}
+              </td>
+              <td style="padding:0.85rem 1.25rem;">
+                <div style="font-weight:600; font-size:0.88rem; color:var(--color-text-primary);">
+                  {{ p.station_name or 'EZ Charge Hub' }}
+                </div>
+                <div style="font-size:0.75rem; color:var(--color-text-secondary);">
+                  {{ p.point_code or 'CP-01' }} &bull; {{ p.city or 'Delhi NCR' }}
+                </div>
+              </td>
+              <td style="padding:0.85rem 1.25rem; font-size:0.82rem; color:var(--color-text-secondary);">
+                {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at and p.created_at.strftime is defined else (p.created_at or '') }}
+              </td>
+              <td style="padding:0.85rem 1.25rem; font-size:0.82rem;">
+                <span class="tech-chip">{{ p.payment_method or 'RAZORPAY_TEST' }}</span>
+              </td>
+              <td style="padding:0.85rem 1.25rem; text-align:right; font-size:0.92rem; font-weight:700; color:var(--color-text-primary);">
+                ₹{{ "%.2f"|format(p.amount) }}
+              </td>
+              <td style="padding:0.85rem 1.25rem; text-align:center;">
+                {% if p.payment_status in ('SUCCESS', 'CAPTURED') %}
+                  <span class="badge badge-success" style="font-size:0.72rem;">SUCCESS</span>
+                {% elif p.payment_status == 'PAYMENT_DUE' %}
+                  <span class="badge badge-warning" style="font-size:0.72rem;">PAYMENT DUE (CASH)</span>
+                {% elif p.payment_status == 'PENDING' %}
+                  <span class="badge badge-info" style="font-size:0.72rem;">PENDING</span>
+                {% else %}
+                  <span class="badge badge-danger" style="font-size:0.72rem;">{{ p.payment_status }}</span>
+                {% endif %}
+              </td>
+              <td style="padding:0.85rem 1.25rem; text-align:right;">
+                <div style="display:flex; justify-content:flex-end; gap:0.4rem; align-items:center;">
+                  <button type="button" class="btn btn-secondary btn-xs" onclick='openPaymentModal({{ p|tojson }})' title="Inspect Transaction Slip">
+                    Receipt
+                  </button>
+                  <a href="{{ url_for('customer.payment_receipt_text', payment_id=p.payment_id) }}" class="btn btn-secondary btn-xs" title="Download Official Tax Invoice (.txt)">
+                    📥
+                  </a>
+                  {% if p.payment_status in ('PENDING', 'FAILED') and p.session_id %}
+                    <a href="{{ url_for('customer.checkout', session_id=p.session_id) }}" class="btn btn-primary btn-xs">
+                      Retry
+                    </a>
+                  {% elif p.payment_status in ('PENDING', 'FAILED') and p.booking_id %}
+                    <a href="{{ url_for('customer.booking_checkout', booking_id=p.booking_id) }}" class="btn btn-primary btn-xs">
+                      Retry
+                    </a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 1.5rem; border-top:1px solid var(--color-border); font-size:0.85rem; color:var(--color-text-secondary);">
+        <div>Showing Page {{ current_page }} of {{ total_pages }} ({{ total_count }} total)</div>
+        <div style="display:flex; gap:0.4rem;">
+          {% if current_page > 1 %}
+            <a href="{{ url_for('customer.payments', tab='ledger', page=current_page - 1, search=search_query, status=selected_status, start_date=start_date, end_date=end_date) }}" class="btn btn-secondary btn-xs">&larr; Previous</a>
+          {% endif %}
+          {% if current_page < total_pages %}
+            <a href="{{ url_for('customer.payments', tab='ledger', page=current_page + 1, search=search_query, status=selected_status, start_date=start_date, end_date=end_date) }}" class="btn btn-secondary btn-xs">Next &rarr;</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <!-- Empty State -->
+    <div style="text-align:center; padding:3.5rem 1rem;">
+      <div style="font-size:2.5rem; margin-bottom:0.75rem;">🧾</div>
+      <h3 style="margin:0 0 0.4rem 0; font-size:1.15rem; color:var(--color-text-primary);">No Payment Transactions Found</h3>
+      <p style="margin:0 0 1.25rem 0; font-size:0.85rem; color:var(--color-text-secondary); max-width:48ch; margin-left:auto; margin-right:auto;">
+        {% if search_query or selected_status or start_date or end_date %}
+          No records matched your search filters. Try clearing filters to see past transactions.
+        {% else %}
+          You have not settled any charging sessions or advance booking payments yet.
+        {% endif %}
+      </p>
+      {% if search_query or selected_status or start_date or end_date %}
+        <a href="{{ url_for('customer.payments', tab='ledger') }}" class="btn btn-sm btn-secondary">Clear All Filters</a>
+      {% else %}
+        <a href="{{ url_for('customer.payments', tab='reserve') }}" class="btn btn-sm btn-primary">⚡ Reserve &amp; Pay a Bay</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Receipt / Transaction Details Modal -->
+<div id="paymentModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
+  <div class="card" style="width:100%; max-width:480px; padding:1.75rem; border:1px solid var(--color-border); border-radius:12px; background:#111C2E; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.25rem;">
+      <div>
+        <h3 style="margin:0 0 0.2rem 0; font-size:1.2rem; color:#F8FAFC;">Transaction Receipt</h3>
+        <span id="modalTxRef" style="font-family:monospace; font-size:0.82rem; color:var(--accent-cyan);">-</span>
+      </div>
+      <button type="button" onclick="closePaymentModal()" style="background:transparent; border:none; color:var(--color-text-secondary); font-size:1.25rem; cursor:pointer;">&times;</button>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.02); border:1px solid var(--color-border); border-radius:8px; padding:1rem; margin-bottom:1.25rem; display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem;">
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Station Name:</span>
+        <strong id="modalStation" style="color:#F8FAFC;">-</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Dispenser Bay:</span>
+        <span id="modalDispenser" style="color:#F8FAFC;">-</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Payment Method:</span>
+        <span id="modalMethod" class="badge badge-secondary">-</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">Status:</span>
+        <span id="modalStatus" class="badge badge-success">-</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding-top:0.6rem; border-top:1px solid var(--color-border);">
+        <span style="color:var(--color-text-secondary);">Base Amount:</span>
+        <span id="modalBaseAmount" style="color:#F8FAFC;">₹0.00</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--color-text-secondary);">GST (18% Included):</span>
+        <span id="modalTaxAmount" style="color:#F8FAFC;">₹0.00</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:1.05rem; padding-top:0.4rem; border-top:1px solid var(--color-border);">
+        <strong style="color:#F8FAFC;">Total Settled:</strong>
+        <strong id="modalTotalAmount" style="color:#00D6A0;">₹0.00</strong>
+      </div>
+    </div>
+
+    <div style="font-size:0.75rem; color:var(--color-text-secondary); margin-bottom:1.25rem;">
+      ⚠️ Demonstration note: Operates in Razorpay Test Mode / Simulated Ledger. No actual bank charge occurred.
+    </div>
+
+    <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closePaymentModal()">Close</button>
+      <a id="modalReceiptLink" href="#" class="btn btn-primary btn-sm">
+        View Official Slip &rarr;
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Live Wizard Calculation and Station/Point Filter
+const allPoints = {{ available_points|tojson if available_points else '[]' }};
+const userVehicles = {{ user_vehicles|tojson if user_vehicles else '[]' }};
+
+function onStationChanged() {
+  const stationId = document.getElementById('wizardStationSelect').value;
+  const pointSelect = document.getElementById('wizardPointSelect');
+  pointSelect.innerHTML = '<option value="">-- Select Dispenser --</option>';
+
+  if (!stationId) return;
+
+  const filtered = allPoints.filter(p => String(p.station_id) === String(stationId));
+  filtered.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.point_id;
+    opt.dataset.stationId = p.station_id;
+    opt.dataset.connector = p.connector_type;
+    opt.dataset.power = p.max_power_kw;
+    opt.dataset.tariff = p.tariff_per_kwh;
+    opt.textContent = `${p.point_code} — ${p.connector_type} (${p.max_power_kw} kW) • ₹${parseFloat(p.tariff_per_kwh).toFixed(2)}/kWh`;
+    pointSelect.appendChild(opt);
+  });
+
+  if (filtered.length > 0) {
+    pointSelect.selectedIndex = 1;
+    onPointOrVehicleChanged();
+  }
+}
+
+function onPointOrVehicleChanged() {
+  const pointSelect = document.getElementById('wizardPointSelect');
+  const vehSelect = document.getElementById('wizardVehicleSelect');
+  const badge = document.getElementById('compatibilityBadge');
+
+  if (!pointSelect || pointSelect.selectedIndex <= 0) {
+    if (badge) badge.style.display = 'none';
+    recalcBill();
+    return;
+  }
+
+  const selectedPtOpt = pointSelect.options[pointSelect.selectedIndex];
+  const ptConn = (selectedPtOpt.dataset.connector || '').toUpperCase();
+
+  if (vehSelect && vehSelect.selectedIndex >= 0) {
+    const selectedVehOpt = vehSelect.options[vehSelect.selectedIndex];
+    const vehConn = (selectedVehOpt.dataset.connector || 'CCS2').toUpperCase();
+
+    const isMatch = (!vehConn || vehConn === ptConn || (['CCS2', 'TYPE2'].includes(ptConn) && ['CCS2', 'TYPE2'].includes(vehConn)));
+    if (isMatch) {
+      badge.style.display = 'block';
+      badge.innerHTML = `<span style="color:#00D6A0; font-weight:700;">✅ Compatible:</span> Dispenser connector <strong>${ptConn}</strong> matches your vehicle standard.`;
+    } else {
+      badge.style.display = 'block';
+      badge.innerHTML = `<span style="color:#F59E0B; font-weight:700;">⚠️ Connector Caution:</span> Dispenser provides <strong>${ptConn}</strong>; vehicle specifies <strong>${vehConn}</strong>. Check if adapter is equipped.`;
+    }
+  }
+
+  recalcBill();
+}
+
+function onDurationOrKwhChanged() {
+  const durSelect = document.getElementById('wizardDuration');
+  const kwhInput = document.getElementById('wizardKwh');
+  const pointSelect = document.getElementById('wizardPointSelect');
+
+  let power = 22.0;
+  if (pointSelect && pointSelect.selectedIndex > 0) {
+    power = parseFloat(pointSelect.options[pointSelect.selectedIndex].dataset.power || 22.0);
+  }
+
+  const hours = parseFloat(durSelect.value || 1.0);
+  const approxKwh = Math.round(Math.min(hours * power * 0.85, 75));
+  kwhInput.value = Math.max(10, approxKwh);
+
+  recalcBill();
+}
+
+function recalcBill() {
+  const pointSelect = document.getElementById('wizardPointSelect');
+  const kwhInput = document.getElementById('wizardKwh');
+
+  let rate = 18.0;
+  if (pointSelect && pointSelect.selectedIndex > 0) {
+    rate = parseFloat(pointSelect.options[pointSelect.selectedIndex].dataset.tariff || 18.0);
+  }
+  const kwh = Math.max(1, parseFloat(kwhInput ? kwhInput.value : 20.0) || 20.0);
+
+  const base = Math.round(rate * kwh * 100) / 100;
+  const tax = Math.round(base * 0.18 * 100) / 100;
+  const total = Math.round((base + tax) * 100) / 100;
+
+  const elRate = document.getElementById('calcRate');
+  const elKwh = document.getElementById('calcKwh');
+  const elBase = document.getElementById('calcBase');
+  const elTax = document.getElementById('calcTax');
+  const elTotal = document.getElementById('calcTotal');
+
+  if (elRate) elRate.textContent = rate.toFixed(2);
+  if (elKwh) elKwh.textContent = kwh.toFixed(2);
+  if (elBase) elBase.textContent = base.toFixed(2);
+  if (elTax) elTax.textContent = tax.toFixed(2);
+  if (elTotal) elTotal.textContent = total.toFixed(2);
+}
+
+function onPaymentMethodChanged() {
+  const methodRadios = document.getElementsByName('payment_method');
+  let selected = 'ONLINE';
+  for (const r of methodRadios) {
+    if (r.checked) { selected = r.value; break; }
+  }
+
+  const onlineCard = document.getElementById('payOnlineCard');
+  const cashCard = document.getElementById('payCashCard');
+  const submitBtn = document.getElementById('wizardSubmitBtn');
+
+  if (selected === 'CASH') {
+    if (cashCard) cashCard.style.borderColor = 'var(--accent-emerald)';
+    if (onlineCard) onlineCard.style.borderColor = 'var(--color-border)';
+    if (submitBtn) submitBtn.textContent = 'Reserve Bay & Pay Cash at Station →';
+  } else {
+    if (onlineCard) onlineCard.style.borderColor = 'var(--accent-cyan)';
+    if (cashCard) cashCard.style.borderColor = 'var(--color-border)';
+    if (submitBtn) submitBtn.textContent = 'Confirm Reservation & Proceed to Payment →';
+  }
+}
+
+// Set default start time to 15 mins in future
+document.addEventListener('DOMContentLoaded', () => {
+  const startInput = document.getElementById('wizardStartAt');
+  if (startInput && !startInput.value) {
+    const d = new Date(Date.now() + 15 * 60 * 1000);
+    const pad = n => String(n).padStart(2, '0');
+    startInput.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  onPaymentMethodChanged();
+
+  // If pre-selected station passed, trigger points filter
+  const stSelect = document.getElementById('wizardStationSelect');
+  if (stSelect && stSelect.value) {
+    onStationChanged();
+  } else {
+    recalcBill();
+  }
+});
+
+// Modal Logic
+function openPaymentModal(p) {
+  if (!p) return;
+  document.getElementById('modalTxRef').textContent = p.transaction_reference || ('TXN-' + p.payment_id);
+  document.getElementById('modalStation').textContent = p.station_name || 'EZ Charge Hub';
+  document.getElementById('modalDispenser').textContent = (p.point_code || 'CP-01') + ' · ' + (p.city || 'NCR');
+  document.getElementById('modalMethod').textContent = p.payment_method || 'Razorpay Test';
+  document.getElementById('modalStatus').textContent = p.payment_status || 'SUCCESS';
+  
+  const base = parseFloat(p.base_amount || (p.amount ? p.amount / 1.18 : 0));
+  const tax = parseFloat(p.tax_amount || (p.amount ? p.amount - (p.amount / 1.18) : 0));
+  const total = parseFloat(p.amount || 0);
+
+  document.getElementById('modalBaseAmount').textContent = '₹' + base.toFixed(2);
+  document.getElementById('modalTaxAmount').textContent = '₹' + tax.toFixed(2);
+  document.getElementById('modalTotalAmount').textContent = '₹' + total.toFixed(2);
+  document.getElementById('modalReceiptLink').href = '/customer/payment-result/' + p.payment_id;
+
+  const modal = document.getElementById('paymentModal');
+  modal.style.display = 'flex';
+}
+
+function closePaymentModal() {
+  const modal = document.getElementById('paymentModal');
+  modal.style.display = 'none';
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closePaymentModal();
+});
+</script>
+{% endblock %}

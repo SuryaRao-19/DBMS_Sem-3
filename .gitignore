@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment and secrets
+.env
+*.env
+!.env.example
+Capstone/.env
+Capstone/*.env
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Pytest / Testing cache
+.pytest_cache/
+Capstone/.pytest_cache/
+*.log
+.git_backup/
+*.git_backup
+Capstone/.git_backup/
+
+# Temp & Scratch files
+scratch/
+Capstone/scratch/

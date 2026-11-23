@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Account Settings & Profile - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Account Settings & Profile</h1>
+    <p class="page-subtitle">Manage your personal credentials, contact details, and security preferences.</p>
+  </div>
+</div>
+
+<div class="grid-cols-2">
+  <!-- Profile Information Form -->
+  <div class="card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+      <h2>Personal Details</h2>
+      <span class="role-pill {{ user.role.lower() }}">{{ user.role }}</span>
+    </div>
+
+    <form method="POST" action="{{ url_for('public.profile') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" name="full_name" class="form-control" value="{{ user.full_name }}" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Address (Immutable)</label>
+        <input type="email" class="form-control" value="{{ user.email }}" disabled style="opacity: 0.6; cursor: not-allowed;">
+        <small class="text-dim">Email address serves as your primary unique account identifier.</small>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" name="phone" class="form-control" value="{{ user.phone or '' }}" placeholder="+91 98765 43210">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Account Status</label>
+        <div>
+          <span class="badge badge-{{ user.account_status.lower() }}">{{ user.account_status }}</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Registered Member Since</label>
+        <span class="text-muted" style="font-size: 0.9rem;">{{ user.created_at }}</span>
+      </div>
+
+      <div style="margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
+        <h3 style="margin-bottom: 0.75rem; font-size: 1.1rem;">Security &amp; Password Change</h3>
+        {% if user.has_password %}
+          <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;">
+            Leave these password fields blank if you do not wish to update your login password.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="current_password">Current Password</label>
+            <div class="password-input-wrap">
+              <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter current password to verify">
+              <button type="button" class="password-eye-btn" onclick="togglePasswordVisibility('current_password', this)">Show</button>
+            </div>
+          </div>
+        {% else %}
+          <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;">
+            You signed up with Google Sign-In. You can optionally set a local password below to enable hybrid sign-in.
+          </p>
+        {% endif %}
+
+        <div class="form-group">
+          <label class="form-label" for="new_password">New Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Minimum 6 characters">
+            <button type="button" class="password-eye-btn" onclick="togglePasswordVisibility('new_password', this)">Show</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="confirm_new_password">Confirm New Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="confirm_new_password" name="confirm_new_password" class="form-control" placeholder="Repeat new password">
+            <button type="button" class="password-eye-btn" onclick="togglePasswordVisibility('confirm_new_password', this)">Show</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <button type="submit" class="btn btn-primary btn-block">Save Profile Changes</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Account Scope & Privileges Card -->
+  <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <div>
+      <h2>Role & Access Privileges</h2>
+      <p class="text-muted" style="margin-top: 0.5rem; font-size: 0.925rem;">
+        Your account role dictates your authorization boundary enforced by server-side decorators and database grants.
+      </p>
+
+      <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+        <div class="card" style="background: rgba(255, 255, 255, 0.02); padding: 1rem;">
+          <strong style="color: var(--accent-emerald);">Assigned Role: {{ user.role }}</strong>
+          <p class="text-muted" style="font-size: 0.85rem; margin-top: 0.25rem;">
+            {% if user.role == 'ADMIN' %}
+              Full administrative privileges over stations, charging points, tariffs, user records, conflict overrides, financial reports, and system telemetry diagnostics.
+            {% else %}
+              Standard EV owner access: register multiple electric vehicles, browse verified charging hubs, execute conflict-free slot reservations, run live energy simulator sessions, and review receipts.
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="card" style="background: rgba(255, 255, 255, 0.02); padding: 1rem;">
+          <strong style="color: var(--accent-cyan);">Sign-In Provider &amp; Security</strong>
+          <p class="text-muted" style="font-size: 0.85rem; margin-top: 0.25rem;">
+            Provider: <strong>{{ user.auth_provider or 'LOCAL' }}</strong> &bull;
+            Email Verified: <strong>{{ 'Yes' if user.email_verified else 'Pending' }}</strong>
+            {% if user.last_login %}<br>Last Login: {{ user.last_login }}{% endif %}
+          </p>
+          {% if not user.google_linked %}
+            {% if google_oauth_enabled %}
+              <a href="{{ url_for('auth.google_link') }}" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Link Verified Google Account</a>
+            {% else %}
+              <div class="text-dim" style="font-size: 0.78rem; margin-top: 0.4rem;">Google linking available once <code>GOOGLE_CLIENT_ID</code> &amp; <code>GOOGLE_CLIENT_SECRET</code> are configured.</div>
+            {% endif %}
+          {% else %}
+            <span class="badge badge-available" style="margin-top: 0.4rem;">Google Account Linked</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 2rem; padding: 1rem; border-radius: var(--radius-md); background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.2);">
+      <strong style="color: #fb7185; font-size: 0.9rem;">Sign Out</strong>
+      <p class="text-muted" style="font-size: 0.85rem; margin: 0.25rem 0 0.75rem 0;">
+        Terminate your current session securely across all active devices.
+      </p>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm">Log Out Securely</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block title %}Customer Mobility Overview — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<!-- Welcome & Quick Actions Header -->
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1.25rem; margin-bottom:1.75rem;">
+  <div>
+    <div style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(0,200,255,0.08); border:1px solid rgba(0,200,255,0.22); border-radius:20px; padding:0.25rem 0.75rem; margin-bottom:0.5rem;">
+      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#00D6A0; box-shadow:0 0 8px #00D6A0;"></span>
+      <span style="font-size:0.75rem; font-weight:700; color:#00C8FF; text-transform:uppercase; letter-spacing:0.04em;">Customer Mobility Portal</span>
+    </div>
+    <h1 style="margin:0 0 0.35rem 0; font-size:1.75rem; font-weight:800; color:var(--color-text-primary);">
+      Welcome back, {{ session.get('full_name') or 'EV Driver' }}! 👋
+    </h1>
+    <p class="page-subtitle" style="margin:0; color:var(--color-text-secondary); font-size:0.92rem;">
+      Monitor live charging telemetry, reserve fast-charging slots, and review verified Razorpay Test Mode receipts.
+    </p>
+  </div>
+  <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
+    <a href="{{ url_for('customer.qr_scanner') }}" class="btn btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:0.4rem;">
+      <span>📷</span> Scan Charger QR
+    </a>
+    <a href="{{ url_for('customer.stations') }}" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:0.4rem;">
+      <span>🔍</span> Find Stations
+    </a>
+    <a href="{{ url_for('customer.bookings') }}" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:0.4rem;">
+      <span>📅</span> Book a Slot
+    </a>
+  </div>
+</div>
+
+<!-- Active Charging Alert Banner (if any live session in progress) -->
+{% if active_session %}
+  <div class="card" style="margin-bottom:2rem; border-color:var(--accent-cyan); background:linear-gradient(135deg, rgba(0,200,255,0.12), rgba(0,214,160,0.08)); box-shadow:0 0 24px rgba(0,200,255,0.15);">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1.25rem;">
+      <div>
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.35rem;">
+          <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#00D6A0; box-shadow:0 0 10px #00D6A0;"></span>
+          <strong style="color:var(--accent-cyan); text-transform:uppercase; letter-spacing:0.06em; font-size:0.8rem;">Live Session In Progress</strong>
+          <span class="badge badge-success">Delivering Energy</span>
+        </div>
+        <div style="font-size:1.2rem; font-weight:800; color:#F8FAFC;">
+          {{ active_session.station_name }} &bull; Dispenser {{ active_session.point_code }}
+        </div>
+        <div style="font-size:0.85rem; color:var(--color-text-secondary); margin-top:0.3rem;">
+          Vehicle: <strong style="color:#F8FAFC;">{{ active_session.make }} {{ active_session.model }}</strong> ({{ active_session.registration_no }}) &bull; Initial SoC: {{ active_session.initial_soc }}% &bull; Started: {{ active_session.start_at }}
+        </div>
+      </div>
+      <div style="display:flex; gap:0.75rem; align-items:center;">
+        <a href="{{ url_for('customer.charging') }}" class="btn btn-primary" style="padding:0.65rem 1.25rem;">
+          Monitor Live Telemetry &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<!-- Primary Metric Cards (4-Column Desktop, 2 Tablet, 1 Mobile) -->
+<div class="customer-metrics-grid" style="margin-bottom:2rem;">
+  <!-- Card 1: Total Sessions -->
+  <div class="stat-card cyan">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Total Charging Sessions</span>
+      <span class="stat-card-icon" style="background:rgba(0,200,255,0.12); color:#00C8FF;">⚡</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value">{{ kpis.total_sessions }}</div>
+      <div class="stat-card-subtext">Completed on network</div>
+    </div>
+  </div>
+
+  <!-- Card 2: Total Energy -->
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Total Energy Consumed</span>
+      <span class="stat-card-icon" style="background:rgba(0,214,160,0.12); color:#00D6A0;">🔋</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value">
+        {{ "%.2f"|format(kpis.total_energy_kwh) }} <span style="font-size:1rem; font-weight:600; color:var(--color-text-secondary);">kWh</span>
+      </div>
+      <div class="stat-card-subtext">Delivered to your EVs</div>
+    </div>
+  </div>
+
+  <!-- Card 3: Total Spent -->
+  <div class="stat-card amber">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Total Spent (Test Mode)</span>
+      <span class="stat-card-icon" style="background:rgba(245,158,11,0.12); color:#F59E0B;">₹</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value" style="color:#F59E0B;">
+        ₹{{ "%.2f"|format(kpis.total_amount_spent) }}
+      </div>
+      <div class="stat-card-subtext">Razorpay Test Mode ledger</div>
+    </div>
+  </div>
+
+  <!-- Card 4: Active Bookings -->
+  <div class="stat-card indigo">
+    <div class="stat-card-header">
+      <span class="stat-card-title">Active / Upcoming Slots</span>
+      <span class="stat-card-icon" style="background:rgba(129,140,248,0.12); color:#818CF8;">📅</span>
+    </div>
+    <div class="stat-card-body">
+      <div class="stat-card-value">{{ kpis.active_bookings_count }}</div>
+      <div class="stat-card-subtext">Reserved charging slots</div>
+    </div>
+  </div>
+</div>
+
+<!-- EV Garage Overview Strip -->
+<div class="card" style="margin-bottom:2rem; padding:1.25rem 1.5rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+    <div style="display:flex; align-items:center; gap:1rem;">
+      <div style="width:48px; height:48px; border-radius:12px; background:rgba(0,214,160,0.1); border:1px solid rgba(0,214,160,0.25); display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+        🚗
+      </div>
+      <div>
+        <div style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--accent-cyan);">
+          Registered EV Garage &bull; {{ vehicles|length }} Vehicles
+        </div>
+        <div style="font-size:1rem; font-weight:700; color:#F8FAFC; margin-top:0.2rem;">
+          {% if vehicles %}
+            Primary: {{ vehicles[0].make }} {{ vehicles[0].model }} <span style="font-family:monospace; color:var(--accent-emerald);">({{ vehicles[0].registration_no }})</span> &bull; {{ vehicles[0].battery_capacity_kwh }} kWh &bull; {{ vehicles[0].connector_type }}
+          {% else %}
+            No electric vehicles registered in your garage yet.
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div>
+      <a href="{{ url_for('customer.vehicles') }}" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:0.4rem;">
+        <span>🚘</span> Manage Garage &rarr;
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Two-Column Grid: Upcoming Bookings & Recent Sessions -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:1.75rem; margin-bottom:2rem;">
+  <!-- Column 1: Upcoming & Recent Bookings -->
+  <div class="card" style="background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid var(--color-border);">
+      <h3 style="margin:0; font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:0.5rem;">
+        <span>📅</span> Upcoming &amp; Recent Bookings
+      </h3>
+      <a href="{{ url_for('customer.bookings') }}" style="font-size:0.82rem; font-weight:600; color:var(--accent-cyan); text-decoration:none;">
+        View all &rarr;
+      </a>
+    </div>
+
+    {% if recent_bookings %}
+      <div style="display:flex; flex-direction:column; gap:0.85rem;">
+        {% for b in recent_bookings %}
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1rem; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); transition:border-color 0.15s ease;">
+            <div>
+              <div style="font-weight:700; font-size:0.95rem; color:#F8FAFC;">
+                {{ b.station_name }} &bull; {{ b.point_code }}
+              </div>
+              <div style="font-size:0.8rem; color:var(--color-text-secondary); margin-top:0.25rem;">
+                Slot: {{ b.start_at }} &bull; {{ b.registration_no }} ({{ b.connector_type }})
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span class="badge {% if b.booking_status == 'CONFIRMED' %}badge-success{% elif b.booking_status == 'CANCELLED' %}badge-danger{% else %}badge-info{% endif %}">
+                {{ b.booking_status }}
+              </span>
+              {% if b.qr_token and b.booking_status == 'CONFIRMED' %}
+                <div style="margin-top:0.4rem;">
+                  <a href="{{ url_for('customer.booking_qr_png', booking_id=b.booking_id) }}" target="_blank" class="btn btn-xs btn-outline-cyan" style="font-size:0.75rem; padding:3px 8px; border-radius:6px;">
+                    Check-in QR
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="text-align:center; padding:2.5rem 1rem; color:var(--color-text-secondary);">
+        <p style="margin:0 0 0.85rem 0; font-size:0.9rem;">No reservations scheduled yet.</p>
+        <a href="{{ url_for('customer.stations') }}" class="btn btn-sm btn-primary">Find a Station to Book</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Column 2: Recent Charging Sessions -->
+  <div class="card" style="background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid var(--color-border);">
+      <h3 style="margin:0; font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:0.5rem;">
+        <span>📜</span> Recent Charging Sessions
+      </h3>
+      <a href="{{ url_for('customer.history') }}" style="font-size:0.82rem; font-weight:600; color:var(--accent-cyan); text-decoration:none;">
+        Full history &rarr;
+      </a>
+    </div>
+
+    {% if recent_sessions %}
+      <div style="display:flex; flex-direction:column; gap:0.85rem;">
+        {% for s in recent_sessions %}
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1rem; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); transition:border-color 0.15s ease;">
+            <div>
+              <div style="font-weight:700; font-size:0.95rem; color:#F8FAFC;">
+                {{ s.station_name }} &bull; {{ s.point_code }}
+              </div>
+              <div style="font-size:0.8rem; color:var(--color-text-secondary); margin-top:0.25rem;">
+                {{ s.start_at or s.start_time }} &bull; {{ "%.2f"|format(s.energy_kwh or s.energy_consumed_kwh or 0) }} kWh
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-weight:700; font-size:0.95rem; color:#10B981;">
+                ₹{{ "%.2f"|format(s.total_amount or s.total_cost or 0) }}
+              </div>
+              <span class="badge {% if s.payment_status == 'PAID' or s.payment_status == 'SUCCESS' %}badge-success{% elif s.session_status == 'IN_PROGRESS' %}badge-warning{% else %}badge-info{% endif %}" style="font-size:0.7rem;">
+                {{ s.payment_status or s.session_status }}
+              </span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="text-align:center; padding:2.5rem 1rem; color:var(--color-text-secondary);">
+        <p style="margin:0 0 0.85rem 0; font-size:0.9rem;">No charging sessions recorded yet.</p>
+        <a href="{{ url_for('customer.charging') }}" class="btn btn-sm btn-secondary">Simulate Live Charging</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Saved Stations Showcase -->
+{% if saved_stations %}
+  <div class="card" style="margin-bottom:2rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid var(--color-border);">
+      <h3 style="margin:0; font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:0.5rem;">
+        <span>⭐</span> Bookmarked Charging Stations ({{ saved_stations|length }})
+      </h3>
+      <a href="{{ url_for('customer.saved_stations') }}" style="font-size:0.82rem; font-weight:600; color:var(--accent-cyan); text-decoration:none;">
+        Manage all saved &rarr;
+      </a>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+      {% for st in saved_stations %}
+        <div style="padding:1rem; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); display:flex; flex-direction:column; justify-content:space-between; gap:0.75rem;">
+          <div>
+            <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--accent-cyan);">
+              {{ st.city }} &bull; {{ st.operator_name or 'Tata Power EZ Charge' }}
+            </div>
+            <div style="font-weight:700; font-size:1rem; color:#F8FAFC; margin-top:0.25rem;">
+              <a href="{{ url_for('public.station_detail', station_id=st.station_id) }}" style="color:#F8FAFC; text-decoration:none;">
+                {{ st.station_name }}
+              </a>
+            </div>
+            <div style="font-size:0.8rem; color:var(--color-text-secondary); margin-top:0.25rem;">
+              {{ st.available_points }} / {{ st.total_points }} Available &bull; Peak: {{ st.max_power or 30 }} kW
+            </div>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <a href="{{ url_for('customer.book_slot', point_id=st.station_id) }}" class="btn btn-primary btn-xs" style="flex:1; text-align:center;">
+              Book Slot
+            </a>
+            <a href="{{ url_for('public.station_detail', station_id=st.station_id) }}" class="btn btn-secondary btn-xs">
+              View
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<!-- Quick Shortcuts -->
+<div class="card" style="margin-bottom:2rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.25rem 1.5rem;">
+  <div style="font-weight:700; font-size:0.82rem; margin-bottom:1rem; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.06em;">
+    Quick Navigation
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0.85rem;">
+    <a href="{{ url_for('customer.stations') }}" class="btn btn-secondary btn-sm" style="text-align:left; justify-content:flex-start; padding:0.75rem 1rem;">
+      <span style="font-size:1.15rem; margin-right:0.4rem;">🔍</span> Find Chargers
+    </a>
+    <a href="{{ url_for('customer.qr_scanner') }}" class="btn btn-secondary btn-sm" style="text-align:left; justify-content:flex-start; padding:0.75rem 1rem;">
+      <span style="font-size:1.15rem; margin-right:0.4rem;">📷</span> Scan Placard
+    </a>
+    <a href="{{ url_for('customer.vehicles') }}" class="btn btn-secondary btn-sm" style="text-align:left; justify-content:flex-start; padding:0.75rem 1rem;">
+      <span style="font-size:1.15rem; margin-right:0.4rem;">🚗</span> My Garage ({{ kpis.vehicles_count }})
+    </a>
+    <a href="{{ url_for('customer.bookings') }}" class="btn btn-secondary btn-sm" style="text-align:left; justify-content:flex-start; padding:0.75rem 1rem;">
+      <span style="font-size:1.15rem; margin-right:0.4rem;">📅</span> Reservations
+    </a>
+    <a href="{{ url_for('customer.payments') }}" class="btn btn-secondary btn-sm" style="text-align:left; justify-content:flex-start; padding:0.75rem 1rem;">
+      <span style="font-size:1.15rem; margin-right:0.4rem;">💳</span> Receipts &amp; Ledger
+    </a>
+    <a href="{{ url_for('customer.saved_stations') }}" class="btn btn-secondary btn-sm" style="text-align:left; justify-content:flex-start; padding:0.75rem 1rem;">
+      <span style="font-size:1.15rem; margin-right:0.4rem;">⭐</span> Saved Hubs ({{ kpis.saved_stations_count }})
+    </a>
+  </div>
+</div>
+{% endblock %}

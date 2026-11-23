@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Live Charging Session - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>⚡ Interactive Charging Simulator</h1>
+    <div class="page-subtitle">Real-time simulation of EV energy delivery, tariff calculation, and transaction settlement</div>
+  </div>
+</div>
+
+{% if active_session %}
+  <!-- Live Meter Box when session is IN_PROGRESS -->
+  <div class="simulator-box">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+      <div style="text-align: left;">
+        <span class="badge badge-available" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">
+          <span class="pulse-circle"></span> CHARGING IN PROGRESS
+        </span>
+        <h2 style="margin: 0.5rem 0 0.2rem;">{{ active_session.station_name }}</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">
+          Dispenser: <strong style="color:var(--accent-emerald);">{{ active_session.point_code }}</strong> ({{ active_session.connector_type }}) &bull; Vehicle: <strong>{{ active_session.registration_no }}</strong>
+        </p>
+      </div>
+
+      <div style="text-align: right; background: rgba(255,255,255,0.03); padding: 0.85rem 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <div style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700;">Billing Tariff Rate</div>
+        <div style="font-size: 1.25rem; font-weight: 800; color: #34d399;">₹{{ "%.2f"|format(active_session.tariff_per_kwh) }} / kWh</div>
+      </div>
+    </div>
+
+    <!-- Live Energy Meter Display -->
+    <div class="meter-display">
+      <div id="liveEnergyMeter" class="meter-value">0.000</div>
+      <div class="meter-unit">kWh</div>
+    </div>
+
+    <!-- Live Metrics Grid -->
+    <div style="display: flex; justify-content: center; gap: 3rem; margin: 1.5rem 0 2rem; flex-wrap: wrap;">
+      <div>
+        <div style="font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600;">Session Duration</div>
+        <div id="sessionTimer" style="font-size: 1.5rem; font-weight: 700; font-family: monospace; color: #fff;">00:00:00</div>
+      </div>
+      <div>
+        <div style="font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600;">Power Flow</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-cyan);">{{ active_session.max_power_kw }} kW</div>
+      </div>
+      <div>
+        <div style="font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600;">Estimated Cost</div>
+        <div id="estimatedCost" style="font-size: 1.5rem; font-weight: 800; color: #34d399;">₹0.00</div>
+      </div>
+    </div>
+
+    <!-- Stop Charging Action Form -->
+    <form method="POST" action="{{ url_for('owner.charging') }}" onsubmit="return confirmStopCharging();">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="stop">
+      <input type="hidden" name="session_id" value="{{ active_session.session_id }}">
+      <input type="hidden" id="finalEnergyInput" name="energy_kwh" value="0.000">
+
+      <div style="display: flex; justify-content: center; gap: 1rem; align-items: center;">
+        <button type="submit" class="btn btn-danger" style="padding: 0.85rem 2rem; font-size: 1rem;">
+          ⏹ Stop Charging & Generate Bill
+        </button>
+      </div>
+    </form>
+  </div>
+
+{% else %}
+  <!-- Form to Start New Session when NO active session -->
+  <div style="max-width: 680px; margin: 2rem auto;">
+    <div class="card" style="padding: 2rem;">
+      <h2 style="margin-bottom: 0.5rem;">Start Simulated Charging Session</h2>
+      <p class="page-subtitle" style="margin-bottom: 1.5rem;">
+        Select your vehicle and an active dispenser to initiate an energy delivery session.
+      </p>
+
+      {% if not vehicles %}
+        <div class="alert alert-warning">
+          <span>You need to register at least one electric vehicle before starting a session.</span>
+          <a href="{{ url_for('owner.vehicles') }}" class="btn btn-secondary btn-sm">Add Vehicle</a>
+        </div>
+      {% elif not available_points %}
+        <div class="alert alert-warning">
+          <span>All charging points are currently occupied or under maintenance. Please check back shortly.</span>
+        </div>
+      {% else %}
+        <form method="POST" action="{{ url_for('owner.charging') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="start">
+
+          <div class="form-group">
+            <label class="form-label">Select Registered Vehicle</label>
+            <select name="vehicle_id" class="form-control" required>
+              {% for v in vehicles %}
+                <option value="{{ v.vehicle_id }}">
+                  {{ v.make }} {{ v.model }} ({{ v.registration_no }}) - {{ v.battery_capacity_kwh }} kWh Pack
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Select Charging Dispenser</label>
+            <select name="point_id" class="form-control" required>
+              {% for p in available_points %}
+                <option value="{{ p.point_id }}">
+                  {{ p.station_name }} &bull; {{ p.point_code }} [{{ p.connector_type }} - {{ p.max_power_kw }} kW] - ₹{{ "%.2f"|format(p.tariff_per_kwh) }}/kWh
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if bookings %}
+            <div class="form-group">
+              <label class="form-label">Link Confirmed Booking (Optional)</label>
+              <select name="booking_id" class="form-control">
+                <option value="">-- Walk-in / Direct Charging (No Reservation) --</option>
+                {% for b in bookings %}
+                  <option value="{{ b.booking_id }}">
+                    Booking #{{ b.booking_id }} &bull; {{ b.station_name }} ({{ b.point_code }})
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+
+          <button type="submit" class="btn btn-primary btn-block" style="padding: 0.85rem; font-size: 1rem; margin-top: 1.5rem;">
+            ⚡ Start Charging Session
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+<!-- Simulated Payment Settlement Modal -->
+<div id="paymentModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Settle Charging Session Bill</h3>
+      <button class="modal-close" onclick="closeModal('paymentModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('owner.charging') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="pay">
+      <input type="hidden" id="pay_session_id" name="session_id" value="">
+
+      <div class="demo-payment-banner">
+        DEMO PAYMENT — NO REAL MONEY WILL BE CHARGED. (Do not enter real card/UPI credentials.)
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: var(--radius-md); padding: 1.25rem; text-align: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Demo Bill Due</div>
+        <div id="modalPayAmount" style="font-size: 2.5rem; font-weight: 900; color: #34d399; margin: 0.25rem 0;">₹0.00</div>
+        <div style="font-size: 0.75rem; color: var(--text-dim);">Computed via Stored Procedure: CalculateChargingCost(kWh, Tariff)</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="chg_payment_method">Select Demo Payment Method</label>
+        <select id="chg_payment_method" name="payment_method" class="form-control">
+          <option value="UPI">UPI (Demo Simulation)</option>
+          <option value="CREDIT_CARD">Credit Card (Demo Simulation)</option>
+          <option value="DEBIT_CARD">Debit Card (Demo Simulation)</option>
+          <option value="NET_BANKING">Net Banking (Demo Simulation)</option>
+          <option value="WALLET">EV Wallet (Demo Simulation)</option>
+          <option value="CASH">Cash at Station Desk (Demo)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="chg_sim_outcome">Simulated Gateway Outcome</label>
+        <select id="chg_sim_outcome" name="simulated_outcome" class="form-control">
+          <option value="SUCCESS">Simulate Payment Success</option>
+          <option value="FAILED">Simulate Payment Failure</option>
+          <option value="PENDING">Simulate Pending Confirmation</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('paymentModal')">Pay Later</button>
+        <button type="submit" class="btn btn-primary">Run Demo Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block extra_scripts %}
+{% if active_session %}
+<script>
+  // Simulation Variables
+  let energyDelivered = 0.000;
+  const tariff = parseFloat("{{ active_session.tariff_per_kwh }}");
+  const maxPowerKw = parseFloat("{{ active_session.max_power_kw }}");
+  let secondsElapsed = 0;
+
+  // Energy tick: simulate fast charging delivery in real-time
+  // Every 500ms, deliver power scaled for realistic visual feedback
+  const energyInterval = setInterval(() => {
+    // Deliver ~0.08 kWh every 500ms for fast responsive demonstration
+    const delta = (maxPowerKw / 3600) * 2.5; 
+    energyDelivered += delta;
+    secondsElapsed += 1;
+
+    // Update UI elements
+    document.getElementById('liveEnergyMeter').innerText = energyDelivered.toFixed(3);
+    document.getElementById('finalEnergyInput').value = energyDelivered.toFixed(3);
+
+    // Live Cost Calculation
+    const currentCost = (energyDelivered * tariff).toFixed(2);
+    document.getElementById('estimatedCost').innerText = '₹' + currentCost;
+
+    // Update Timer
+    const hrs = String(Math.floor(secondsElapsed / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((secondsElapsed % 3600) / 60)).padStart(2, '0');
+    const secs = String(secondsElapsed % 60).padStart(2, '0');
+    document.getElementById('sessionTimer').innerText = `${hrs}:${mins}:${secs}`;
+  }, 500);
+
+  function confirmStopCharging() {
+    clearInterval(energyInterval);
+    const finalEnergy = energyDelivered.toFixed(3);
+    const finalCost = (energyDelivered * tariff).toFixed(2);
+    return confirm(`Complete charging session with ${finalEnergy} kWh delivered for ₹${finalCost}?`);
+  }
+</script>
+{% endif %}
+{% endblock %}
+{% endblock %}

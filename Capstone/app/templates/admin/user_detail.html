@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}User Inspection — {{ user.full_name }} — Admin Console{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <a href="{{ url_for('admin.users') }}" style="font-size:0.85rem; color:var(--text-dim); text-decoration:none;">&larr; Back to Users</a>
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-top:0.35rem;">
+    <div>
+      <h1 style="margin:0 0 0.25rem 0;">{{ user.full_name }}</h1>
+      <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+        <span class="role-pill {{ 'customer' if user.role in ('CUSTOMER', 'USER') else user.role.lower() }}">
+          {{ 'CUSTOMER' if user.role == 'USER' else user.role }}
+        </span>
+        <span class="badge {% if user.account_status == 'ACTIVE' %}badge-success{% else %}badge-danger{% endif %}">
+          {{ user.account_status }}
+        </span>
+        <span class="badge badge-secondary">{{ user.auth_provider or 'LOCAL' }}</span>
+        {% if user.is_demo %}
+          <span class="badge badge-warning">DEMO ACCOUNT</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if user.user_id != session.get('user_id') %}
+      <form method="POST" action="{{ url_for('admin.toggle_status', user_id=user.user_id) }}" onsubmit="return confirm('Toggle status for {{ user.full_name }}?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if user.account_status == 'ACTIVE' %}
+          <button type="submit" class="btn btn-outline-danger btn-sm">Deactivate Account</button>
+        {% else %}
+          <button type="submit" class="btn btn-primary btn-sm">Activate Account</button>
+        {% endif %}
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Profile Info Card -->
+<div class="card" style="margin-bottom:1.75rem;">
+  <h3 style="margin:0 0 1rem 0; font-size:1.1rem;">Account Metadata</h3>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; font-size:0.88rem;">
+    <div>
+      <span style="color:var(--text-dim); display:block;">Email Address</span>
+      <strong>{{ user.email }}</strong>
+    </div>
+    <div>
+      <span style="color:var(--text-dim); display:block;">Phone Number</span>
+      <span>{{ user.phone or 'Not provided' }}</span>
+    </div>
+    <div>
+      <span style="color:var(--text-dim); display:block;">Member Since</span>
+      <span>{{ user.created_at }}</span>
+    </div>
+    <div>
+      <span style="color:var(--text-dim); display:block;">Last Login</span>
+      <span>{{ user.last_login or 'Never' }}</span>
+    </div>
+    <div>
+      <span style="color:var(--text-dim); display:block;">Google Identity</span>
+      <span>{% if user.google_linked %}Linked{% else %}None{% endif %}</span>
+    </div>
+  </div>
+</div>
+
+<!-- If Owner: Assigned Stations -->
+{% if owned_stations %}
+  <div class="card" style="margin-bottom:1.75rem;">
+    <h3 style="margin:0 0 1rem 0; font-size:1.1rem;">Assigned Charging Stations ({{ owned_stations|length }})</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1rem;">
+      {% for st in owned_stations %}
+        <div style="padding:0.85rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border);">
+          <div style="font-weight:700; font-size:1rem;">{{ st.station_name }}</div>
+          <div style="font-size:0.82rem; color:var(--text-dim); margin:0.25rem 0;">
+            📍 {{ st.city }} &bull; {{ st.address }}
+          </div>
+          <div style="font-size:0.8rem; color:var(--accent-cyan);">
+            Dispensers: {{ st.total_points }}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<!-- Registered Vehicles -->
+<div class="card" style="margin-bottom:1.75rem;">
+  <h3 style="margin:0 0 1rem 0; font-size:1.1rem;">Registered Vehicles ({{ vehicles|length }})</h3>
+  {% if vehicles %}
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+      {% for v in vehicles %}
+        <div style="padding:0.85rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <strong>{{ v.make }} {{ v.model }}</strong>
+            {% if v.is_default %}<span class="badge badge-success" style="font-size:0.65rem;">Primary</span>{% endif %}
+          </div>
+          <div style="font-size:0.82rem; color:var(--accent-cyan); margin:0.2rem 0;">{{ v.registration_no }}</div>
+          <div style="font-size:0.8rem; color:var(--text-dim);">
+            Battery: {{ v.battery_capacity_kwh }} kWh &bull; Connector: {{ v.connector_type }}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p style="color:var(--text-dim); margin:0; font-size:0.88rem;">No vehicles registered.</p>
+  {% endif %}
+</div>
+
+<!-- Two-Column Grid: Bookings & Sessions -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:1.5rem;">
+  <!-- Bookings -->
+  <div class="card">
+    <h3 style="margin:0 0 1rem 0; font-size:1.05rem;">Bookings ({{ bookings|length }})</h3>
+    {% if bookings %}
+      <div style="display:flex; flex-direction:column; gap:0.65rem;">
+        {% for b in bookings %}
+          <div style="padding:0.75rem; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.2rem;">
+              <strong>#{{ b.booking_id }} &bull; {{ b.station_name }}</strong>
+              <span class="badge {% if b.booking_status == 'CONFIRMED' %}badge-success{% else %}badge-info{% endif %}">
+                {{ b.booking_status }}
+              </span>
+            </div>
+            <div style="color:var(--text-dim); font-size:0.8rem;">
+              Dispenser {{ b.point_code }} &bull; {{ b.registration_no }} &bull; {{ b.start_at }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color:var(--text-dim); margin:0; font-size:0.88rem;">No bookings recorded.</p>
+    {% endif %}
+  </div>
+
+  <!-- Sessions -->
+  <div class="card">
+    <h3 style="margin:0 0 1rem 0; font-size:1.05rem;">Charging Sessions ({{ sessions|length }})</h3>
+    {% if sessions %}
+      <div style="display:flex; flex-direction:column; gap:0.65rem;">
+        {% for s in sessions %}
+          <div style="padding:0.75rem; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.2rem;">
+              <strong>#{{ s.session_id }} &bull; {{ s.station_name }}</strong>
+              <strong style="color:#10B981;">₹{{ "%.2f"|format(s.total_cost or 0) }}</strong>
+            </div>
+            <div style="color:var(--text-dim); font-size:0.8rem;">
+              {{ s.energy_consumed_kwh or 0 }} kWh &bull; {{ s.start_time }} &bull; {{ s.payment_status or s.session_status }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color:var(--text-dim); margin:0; font-size:0.88rem;">No charging sessions recorded.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+

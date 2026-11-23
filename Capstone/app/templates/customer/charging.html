@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Active Charging — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <h1 style="margin:0 0 0.35rem 0;">Active Charging Telemetry &amp; Simulator</h1>
+  <p class="page-subtitle" style="margin:0;">
+    Real-time energy dispensing monitoring and hardware simulator for demonstration.
+  </p>
+</div>
+
+{% if active_session %}
+  <!-- Active Charging Telemetry Screen -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:1.75rem;">
+    <div class="card" style="border-color:var(--color-brand-secondary); background:linear-gradient(135deg, rgba(6,182,212,0.08), rgba(16,185,129,0.04));">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <span class="badge badge-success" style="font-size:0.8rem; padding:4px 10px;">
+          ⚡ Dispensing Power
+        </span>
+        <span style="font-size:0.85rem; color:var(--text-dim);">Session #{{ active_session.session_id }}</span>
+      </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <h2 style="margin:0 0 0.25rem 0; font-size:1.35rem;">{{ active_session.station_name }}</h2>
+        <div style="font-size:0.9rem; color:var(--accent-cyan); font-weight:600;">
+          Dispenser {{ active_session.point_code }} &bull; {{ active_session.connector_type }}
+        </div>
+        <div style="font-size:0.85rem; color:var(--text-dim); margin-top:0.25rem;">
+          Vehicle: {{ active_session.make }} {{ active_session.model }} ({{ active_session.registration_no }})
+        </div>
+      </div>
+
+      <!-- Battery SoC Visualizer -->
+      <div style="margin-bottom:1.5rem;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.9rem;">
+          <span>Battery Charge Level</span>
+          <strong id="socDisplay" style="color:#10B981; font-size:1.1rem;">68%</strong>
+        </div>
+        <div style="height:16px; background:rgba(255,255,255,0.06); border-radius:10px; overflow:hidden; border:1px solid var(--color-border);">
+          <div id="socProgressBar" style="width:68%; height:100%; background:linear-gradient(90deg, var(--accent-cyan), #10B981); border-radius:10px; transition:width 0.4s ease;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:0.35rem; font-size:0.75rem; color:var(--text-dim);">
+          <span>Plugged in at: {{ active_session.initial_soc }}%</span>
+          <span>Target: 80% (Fast Charge)</span>
+        </div>
+      </div>
+
+      <!-- Live Meter Grid -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem; margin-bottom:1.5rem;">
+        <div style="padding:0.75rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border);">
+          <div style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase;">Energy Delivered</div>
+          <div style="font-size:1.25rem; font-weight:700; color:var(--accent-cyan);" id="liveKwh">
+            18.42 <span style="font-size:0.8rem; font-weight:400;">kWh</span>
+          </div>
+        </div>
+
+        <div style="padding:0.75rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border);">
+          <div style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase;">Charging Rate</div>
+          <div style="font-size:1.25rem; font-weight:700; color:#10B981;">
+            {{ active_session.power_rating_kw or 30 }} <span style="font-size:0.8rem; font-weight:400;">kW</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stop Charging Form -->
+      <form method="POST" action="{{ url_for('customer.charging_stop', session_id=active_session.session_id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" id="final_soc_input" name="final_soc" value="80">
+        <input type="hidden" id="energy_input" name="energy_consumed_kwh" value="22.5">
+
+        <button type="submit" class="btn btn-primary btn-block" style="background:#EF4444; border-color:#EF4444;" onclick="return confirm('Disconnect charger and proceed to checkout?');">
+          ⏹️ Complete Session &amp; Pay &rarr;
+        </button>
+      </form>
+    </div>
+
+    <!-- Simulator Control Box -->
+    <div class="card" style="align-self:start;">
+      <h3 style="margin:0 0 1rem 0; font-size:1.15rem;">Demonstration Telemetry Controls</h3>
+      <p style="font-size:0.85rem; color:var(--text-dim); line-height:1.4; margin-bottom:1rem;">
+        As an independent academic demonstration, hardware delivery is simulated in real time. You can adjust the simulated target values below before finalizing payment.
+      </p>
+
+      <div class="form-group">
+        <label class="form-label" for="simSocSlider">Simulated Final Battery SoC (%)</label>
+        <input type="range" id="simSocSlider" min="25" max="100" value="80" class="form-control" style="cursor:pointer;" oninput="updateSimValues(this.value)">
+      </div>
+
+      <div style="padding:0.75rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); font-size:0.85rem;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+          <span style="color:var(--text-dim);">Selected Final SoC:</span>
+          <strong id="simSocVal">80%</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--text-dim);">Simulated kWh to Bill:</span>
+          <strong id="simKwhVal">22.50 kWh</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <!-- Session Starter Wizard -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:1.75rem;">
+    <div class="card">
+      <h3 style="margin:0 0 1.25rem 0; font-size:1.15rem;">Plug In &amp; Start Charging</h3>
+
+      {% if not vehicles %}
+        <div style="padding:1rem; border-radius:8px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); margin-bottom:1rem;">
+          <p style="margin:0; font-size:0.88rem; color:#FCD34D;">
+            Please register your electric vehicle in <a href="{{ url_for('customer.vehicles') }}" style="color:#FFF; font-weight:700;">My Vehicles</a> first before initiating a charging session.
+          </p>
+        </div>
+      {% else %}
+        <form method="POST" action="{{ url_for('customer.charging_start') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="form-group">
+            <label class="form-label" for="vehicle_id">Select Your EV</label>
+            <select id="vehicle_id" name="vehicle_id" class="form-control" required>
+              {% for v in vehicles %}
+                <option value="{{ v.vehicle_id }}">
+                  {{ v.make }} {{ v.model }} ({{ v.registration_no }}) &bull; {{ v.battery_capacity_kwh }} kWh
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="point_id">Select Available Dispenser</label>
+            <select id="point_id" name="point_id" class="form-control" required>
+              {% for pt in available_points %}
+                <option value="{{ pt.point_id }}">
+                  {{ pt.station_name }} ({{ pt.city }}) &bull; {{ pt.point_code }} &bull; {{ pt.connector_type }} &bull; ₹{{ "%.2f"|format(pt.tariff_per_kwh) }}/kWh
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="initial_soc">Initial Battery SoC Level (%)</label>
+            <input type="number" id="initial_soc" name="initial_soc" class="form-control" min="5" max="90" value="20" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" style="margin-top:1.25rem;">
+            ⚡ Plug In &amp; Start Session
+          </button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="card" style="align-self:start;">
+      <h3 style="margin:0 0 1rem 0; font-size:1.15rem;">At an On-Site Charging Station?</h3>
+      <p style="font-size:0.85rem; color:var(--text-dim); line-height:1.5; margin-bottom:1.25rem;">
+        If you are physically parked next to a Tata Power EZ Charge dispenser, scan the QR placard on the charging pedestal to directly authenticate and open the dispenser!
+      </p>
+      <a href="{{ url_for('customer.qr_scanner') }}" class="btn btn-secondary btn-block">
+        📷 Launch QR Scanner
+      </a>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function updateSimValues(val) {
+  const soc = parseInt(val, 10);
+  document.getElementById('simSocVal').textContent = `${soc}%`;
+  document.getElementById('socDisplay').textContent = `${soc}%`;
+  document.getElementById('socProgressBar').style.width = `${soc}%`;
+  document.getElementById('final_soc_input').value = soc;
+
+  const initSoc = {{ active_session.initial_soc if active_session else 20 }};
+  const diff = Math.max(5, soc - initSoc);
+  const kwh = (diff * 0.45).toFixed(2);
+
+  document.getElementById('simKwhVal').textContent = `${kwh} kWh`;
+  document.getElementById('liveKwh').innerHTML = `${kwh} <span style="font-size:0.8rem; font-weight:400;">kWh</span>`;
+  document.getElementById('energy_input').value = kwh;
+}
+</script>
+{% endblock %}
+

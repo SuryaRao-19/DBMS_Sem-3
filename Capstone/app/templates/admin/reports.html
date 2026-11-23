@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Operational & Revenue Reports - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+  <div class="page-header-title">
+    <h1>Operational & Financial Reports</h1>
+    <div class="page-subtitle">Phase 3 DBMS Reports: Real-time aggregation of energy delivered, station utilization, and financial revenue</div>
+  </div>
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    <a href="{{ url_for('admin.export_reports', type='revenue') }}" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;">
+      📥 Export Revenue CSV
+    </a>
+    <a href="{{ url_for('admin.export_reports', type='energy') }}" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;">
+      ⚡ Export Energy CSV
+    </a>
+    <a href="{{ url_for('admin.export_reports', type='utilization') }}" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;">
+      📊 Export Utilization CSV
+    </a>
+  </div>
+</div>
+
+<!-- Section 1: Monthly Revenue Report by Station -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="margin-bottom: 1.25rem;">
+    <h3>Report 1: Monthly Revenue Breakdown by Station (₹)</h3>
+    <p class="page-subtitle">Calculated strictly from successful settlements in the Payments table (GROUP BY station_id, month)</p>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Station Name</th>
+          <th>City</th>
+          <th>Billing Month</th>
+          <th>Successful Transactions</th>
+          <th>Total Revenue Collected</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in revenue_data %}
+          <tr>
+            <td style="font-weight: 700;">{{ r.station_name }}</td>
+            <td><span style="color: var(--accent-cyan);">{{ r.city }}</span></td>
+            <td><span style="font-weight: 600;">{{ r.revenue_month }}</span></td>
+            <td>{{ r.successful_transactions }} payments</td>
+            <td>
+              <span style="font-weight: 800; color: #34d399; font-size: 1.1rem;">₹{{ "%.2f"|format(r.total_revenue) }}</span>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" style="text-align:center;color:var(--text-dim);">No revenue records available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Section 2: Monthly Energy Delivered by Station -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="margin-bottom: 1.25rem;">
+    <h3>Report 2: Monthly Energy Dispensed by Station (kWh)</h3>
+    <p class="page-subtitle">Aggregated from completed ChargingSessions table (GROUP BY station_id, month)</p>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Station Name</th>
+          <th>City</th>
+          <th>Billing Month</th>
+          <th>Completed Sessions</th>
+          <th>Total Energy (kWh)</th>
+          <th>Average kWh / Session</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in energy_data %}
+          <tr>
+            <td style="font-weight: 700;">{{ e.station_name }}</td>
+            <td><span style="color: var(--accent-cyan);">{{ e.city }}</span></td>
+            <td><span style="font-weight: 600;">{{ e.usage_month }}</span></td>
+            <td>{{ e.completed_sessions }}</td>
+            <td style="font-weight: 800; color: var(--accent-emerald); font-size: 1.05rem;">
+              {{ "%.2f"|format(e.total_energy_kwh) }} kWh
+            </td>
+            <td>{{ "%.2f"|format(e.avg_kwh_per_session) }} kWh</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" style="text-align:center;color:var(--text-dim);">No energy records available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Section 3 & 4: Station Utilization & Booking Distribution -->
+<div class="grid-cols-2">
+  <!-- Station Utilization -->
+  <div class="card">
+    <div style="margin-bottom: 1.25rem;">
+      <h3>Report 3: Station Utilization</h3>
+      <p class="page-subtitle">Cumulative charging hours delivered per station hub</p>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Station</th>
+            <th>Dispensers</th>
+            <th>Sessions</th>
+            <th>Total Hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in utilization_data %}
+            <tr>
+              <td>
+                <div style="font-weight: 700;">{{ u.station_name }}</div>
+                <div style="font-size: 0.75rem; color: var(--text-dim);">{{ u.city }}</div>
+              </td>
+              <td>{{ u.dispenser_count }}</td>
+              <td>{{ u.total_sessions }}</td>
+              <td>
+                <span style="font-weight: 700; color: var(--accent-amber);">{{ u.total_charge_hours }} hrs</span>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" style="text-align:center;color:var(--text-dim);">No utilization data.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Booking Status Distribution -->
+  <div class="card">
+    <div style="margin-bottom: 1.25rem;">
+      <h3>Report 4: Reservation Fulfillment Distribution</h3>
+      <p class="page-subtitle">Breakdown of booking statuses across all stations</p>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Total Count</th>
+            <th>Share (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in status_distribution %}
+            <tr>
+              <td>
+                <span class="badge badge-{{ s.booking_status.lower() }}">{{ s.booking_status }}</span>
+              </td>
+              <td style="font-weight: 700;">{{ s.count }}</td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <div class="progress-track">
+                    <div style="width: {{ s.percentage }}%; height: 100%; background: var(--accent-emerald); border-radius: var(--radius-full);"></div>
+                  </div>
+                  <span style="font-weight: 600; font-size: 0.85rem;">{{ s.percentage }}%</span>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" style="text-align:center;color:var(--text-dim);">No booking status data.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

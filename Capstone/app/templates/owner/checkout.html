@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Razorpay Test Checkout #{{ checkout.session_id }} - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Razorpay Secure Checkout <span class="integrity-pill integrity-estimated">TEST MODE ONLY</span></h1>
+    <div class="page-subtitle">Server-calculated EV charging settlement with cryptographic HMAC-SHA256 verification</div>
+  </div>
+  <a href="{{ url_for('owner.history') }}" class="btn btn-secondary btn-sm">&larr; Back to History</a>
+</div>
+
+<div class="demo-payment-banner">
+  RAZORPAY TEST MODE ONLY — NO REAL FINANCIAL TRANSACTION WILL BE CHARGED. Use Razorpay test credentials or sandbox simulator only.
+</div>
+
+<div class="checkout-grid">
+  <!-- Left Column: Station & Billing Summary -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem; padding-bottom:1rem; border-bottom:1px solid var(--border-color); margin-bottom:1rem;">
+      <div>
+        <span class="meta-label">Charging Session Summary</span>
+        <h2 style="margin:0.25rem 0 0;">Session #{{ checkout.session_id }}</h2>
+        <div class="text-muted" style="font-size:0.86rem;">
+          {% if checkout.booking_id %}Linked Reservation #{{ checkout.booking_id }}{% else %}Walk-in / Direct Session{% endif %}
+        </div>
+      </div>
+      <span class="badge badge-{{ (checkout.payment.payment_status if checkout.payment else 'PENDING')|lower }}">
+        {{ checkout.payment.payment_status if checkout.payment else 'AWAITING PAYMENT' }}
+      </span>
+    </div>
+
+    <div style="margin-bottom:1.25rem;">
+      <div class="summary-line"><span class="text-muted">Charging Hub</span><strong>{{ checkout.station_name }}</strong></div>
+      <div class="summary-line"><span class="text-muted">Address</span><span style="text-align:right; max-width:60%;">{{ checkout.address }}, {{ checkout.city }} {{ checkout.postal_code or '' }}</span></div>
+      <div class="summary-line"><span class="text-muted">Dispenser &amp; Output</span><span>{{ checkout.point_code }} ({{ checkout.connector_type }} &bull; {{ checkout.max_power_kw }} kW)</span></div>
+      <div class="summary-line"><span class="text-muted">Vehicle</span><span>{{ checkout.make }} {{ checkout.model }} ({{ checkout.registration_no }})</span></div>
+      <div class="summary-line"><span class="text-muted">Energy Delivered</span><strong style="color:var(--accent-emerald);">{{ "%.3f"|format(checkout.energy_kwh) }} kWh</strong></div>
+      <div class="summary-line"><span class="text-muted">Demo Tariff Rate</span><span>₹{{ "%.2f"|format(checkout.tariff_per_kwh) }} / kWh</span></div>
+      <div class="summary-line"><span class="text-muted">Energy Base Value</span><span>₹{{ "%.2f"|format(checkout.breakdown.base_amount) }}</span></div>
+      <div class="summary-line"><span class="text-muted">GST (18% Included)</span><span>₹{{ "%.2f"|format(checkout.breakdown.tax_amount) }}</span></div>
+      <div class="summary-line total"><span>Final Payable Amount (INR)</span><span>₹{{ "%.2f"|format(checkout.breakdown.total_amount) }}</span></div>
+    </div>
+  </div>
+
+  <!-- Right Column: Razorpay Checkout Controls & Verification Status -->
+  <div class="card">
+    <h3 style="margin-bottom:0.35rem;">Payment Gateway Execution</h3>
+    <p class="text-muted" style="font-size:0.85rem; margin-bottom:1.25rem;">
+      {% if razorpay_live_test_ready %}
+        Connected to Razorpay Standard Checkout (<code>rzp_test_*</code>). Server order creation and HMAC-SHA256 verification are enforced.
+      {% else %}
+        Razorpay API keys are currently blank in <code>.env</code>. Checkout runs using our server-signed <strong>Razorpay Test Sandbox</strong> exercising the same order creation, HMAC verification, and DB ledger pipeline.
+      {% endif %}
+    </p>
+
+    {% if checkout.payment and checkout.payment.payment_status == 'SUCCESS' %}
+      <div style="background:rgba(0,201,133,0.12); border:1px solid rgba(0,201,133,0.35); border-radius:var(--radius-md); padding:1.15rem; margin-bottom:1rem;">
+        <div style="font-weight:800; color:var(--accent-emerald); margin-bottom:0.35rem;">Payment Verified &amp; Recorded (TEST MODE)</div>
+        <div style="font-size:0.84rem; color:var(--text-muted);">
+          Reference: <code>{{ checkout.payment.transaction_reference }}</code><br>
+          {% if checkout.payment.razorpay_payment_id %}Razorpay ID: <code>{{ checkout.payment.razorpay_payment_id }}</code><br>{% endif %}
+          Method: {{ checkout.payment.payment_method }}
+        </div>
+      </div>
+      <div style="display:flex; gap:0.65rem; flex-wrap:wrap;">
+        <a href="{{ url_for('owner.session_receipt', session_id=checkout.session_id) }}" class="btn btn-primary" style="flex:1;">View Receipt</a>
+        <a href="{{ url_for('owner.download_receipt', session_id=checkout.session_id) }}" class="btn btn-secondary">Download .txt</a>
+      </div>
+    {% else %}
+      <div class="form-group">
+        <label class="form-label" for="rzpMethodSelect">Preferred Method (Test Mode)</label>
+        <select id="rzpMethodSelect" class="form-control">
+          <option value="UPI">UPI / QR (Razorpay Test)</option>
+          <option value="CREDIT_CARD">Credit Card (Razorpay Test)</option>
+          <option value="DEBIT_CARD">Debit Card (Razorpay Test)</option>
+          <option value="NET_BANKING">Net Banking (Razorpay Test)</option>
+          <option value="WALLET">Wallets (Razorpay Test)</option>
+        </select>
+      </div>
+
+      <div id="checkoutStatusBox" style="display:none; margin-bottom:1rem; padding:0.85rem; border-radius:var(--radius-md); font-size:0.86rem;"></div>
+
+      <button type="button" id="payWithRazorpayBtn" class="btn btn-primary btn-block" style="padding:0.9rem; font-size:1rem;" onclick="startRazorpayTestCheckout()">
+        Pay ₹{{ "%.2f"|format(checkout.breakdown.total_amount) }} via Razorpay Test Mode
+      </button>
+
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.85rem; text-align:center;">
+        Server-enforced amount validation &bull; Signature verified via SHA-256 HMAC &bull; No real bank debits
+      </div>
+
+      <!-- Dynamic Payment QR Section (10-min TTL + EXPIRED + Retry) -->
+      <div id="dynamicPaymentQrPanel" class="card mt-3" style="padding:1rem; background:rgba(11,18,32,0.55); border:1px dashed var(--border-color);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.45rem;">
+          <strong><i class="fa-solid fa-qrcode"></i> Dynamic Payment QR (Test Mode)</strong>
+          <span class="badge bg-warning">10-MIN EXPIRY</span>
+        </div>
+        <p class="text-muted" style="font-size:0.79rem; margin-bottom:0.7rem;">
+          Single-use invoice QR bound to Session #{{ checkout.session_id }} (₹{{ "%.2f"|format(checkout.breakdown.total_amount) }}).
+          <strong>Scanning does NOT complete payment</strong> &mdash; backend Razorpay webhook or signature verification settles the ledger.
+        </p>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+          <button type="button" id="generatePayQrBtn" class="btn btn-secondary btn-sm" onclick="generateDynamicPaymentQr()">
+            Generate Dynamic Payment QR
+          </button>
+          <span id="qrTimerBadge" class="text-muted" style="font-size:0.8rem; font-weight:600;"></span>
+        </div>
+        <div id="dynamicQrDisplay" style="display:none; margin-top:0.85rem; text-align:center;">
+          <div style="display:inline-block; background:#FFFFFF; padding:0.75rem; border-radius:10px;">
+            <img id="dynamicQrImg" src="" alt="Dynamic Payment QR Code" style="width:184px; height:184px; display:block;">
+          </div>
+          <div id="dynamicQrMeta" class="text-muted" style="font-size:0.78rem; margin-top:0.5rem;"></div>
+          <div id="qrExpiredActions" style="display:none; margin-top:0.65rem;">
+            <span class="badge bg-danger">EXPIRED</span>
+            <button type="button" class="btn btn-primary btn-sm" onclick="generateDynamicPaymentQr()" style="margin-left:0.4rem;">
+              Retry &amp; Regenerate QR
+            </button>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if razorpay_live_test_ready %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+{% endif %}
+<script>
+const SESSION_ID = {{ checkout.session_id }};
+const LIVE_TEST_READY = {{ 'true' if razorpay_live_test_ready else 'false' }};
+const RECEIPT_URL = "{{ url_for('owner.session_receipt', session_id=checkout.session_id) }}";
+
+function setCheckoutStatus(msg, ok) {
+  const box = document.getElementById('checkoutStatusBox');
+  box.style.display = 'block';
+  box.style.background = ok ? 'rgba(0,201,133,0.14)' : 'rgba(244,63,94,0.14)';
+  box.style.border = ok ? '1px solid rgba(0,201,133,0.4)' : '1px solid rgba(244,63,94,0.4)';
+  box.style.color = ok ? '#34d399' : '#fda4af';
+  box.textContent = msg;
+}
+
+async function startRazorpayTestCheckout() {
+  const btn = document.getElementById('payWithRazorpayBtn');
+  const method = document.getElementById('rzpMethodSelect').value;
+  btn.disabled = true;
+  setCheckoutStatus('Creating server-validated Razorpay TEST order...', true);
+
+  try {
+    const orderRes = await csrfFetch('/api/payments/razorpay/order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ session_id: SESSION_ID, payment_method: method }),
+    });
+    const orderData = await orderRes.json();
+    if (!orderRes.ok || !orderData.success) {
+      throw new Error(orderData.error || 'Failed to create Razorpay order.');
+    }
+
+    const order = orderData.order;
+    if (LIVE_TEST_READY && !order.sandbox_mode && typeof Razorpay !== 'undefined') {
+      const options = {
+        key: order.key_id,
+        amount: order.amount_paise,
+        currency: order.currency,
+        name: 'Tata Power EZ Charge Demo',
+        description: `TEST MODE — Charging Session #${SESSION_ID}`,
+        order_id: order.order_id,
+        prefill: {
+          name: {{ checkout.customer_name|tojson }},
+          email: {{ checkout.customer_email|tojson }},
+        },
+        theme: { color: '#00C985' },
+        handler: async function (response) {
+          setCheckoutStatus('Verifying Razorpay signature on server...', true);
+          const verifyRes = await csrfFetch('/api/payments/razorpay/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({
+              session_id: SESSION_ID,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              payment_method: method,
+            }),
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok || !verifyData.success) {
+            setCheckoutStatus(verifyData.error || 'Signature verification failed.', false);
+            btn.disabled = false;
+            return;
+          }
+          setCheckoutStatus('TEST MODE payment verified! Redirecting to receipt...', true);
+          window.location.href = RECEIPT_URL;
+        },
+        modal: {
+          ondismiss: function () {
+            setCheckoutStatus('Checkout dismissed before payment completion.', false);
+            btn.disabled = false;
+          }
+        }
+      };
+      new Razorpay(options).open();
+    } else {
+      setCheckoutStatus(`Order ${order.order_id} created. Verifying HMAC test signature on server...`, true);
+      const sbRes = await csrfFetch('/api/payments/razorpay/sandbox-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+        body: JSON.stringify({
+          session_id: SESSION_ID,
+          razorpay_order_id: order.order_id,
+          payment_method: method,
+        }),
+      });
+      const sbData = await sbRes.json();
+      if (!sbRes.ok || !sbData.success) {
+        throw new Error(sbData.error || 'Sandbox verification failed.');
+      }
+      setCheckoutStatus(`Verified (${sbData.transaction_reference}). Redirecting to receipt...`, true);
+      setTimeout(() => { window.location.href = RECEIPT_URL; }, 700);
+    }
+  } catch (err) {
+    setCheckoutStatus(err.message || 'Checkout failed.', false);
+    btn.disabled = false;
+  }
+}
+
+let qrTimerInterval = null;
+
+async function generateDynamicPaymentQr() {
+  const btn = document.getElementById('generatePayQrBtn');
+  const display = document.getElementById('dynamicQrDisplay');
+  const img = document.getElementById('dynamicQrImg');
+  const meta = document.getElementById('dynamicQrMeta');
+  const timerBadge = document.getElementById('qrTimerBadge');
+  const expiredActions = document.getElementById('qrExpiredActions');
+
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Generating QR...';
+  expiredActions.style.display = 'none';
+
+  try {
+    const res = await csrfFetch('/api/payments/razorpay/qr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({ session_id: SESSION_ID }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Could not generate Dynamic Payment QR.');
+    }
+
+    const qr = data.qr;
+    img.src = qr.qr_image_data_uri;
+    img.style.opacity = '1';
+    display.style.display = 'block';
+    meta.textContent = `QR ID: ${qr.payment_qr_id} • Order: ${qr.order_id} • Mode: ${qr.qr_mode}`;
+
+    let remaining = Number(qr.ttl_seconds || 600);
+    if (qrTimerInterval) clearInterval(qrTimerInterval);
+
+    const updateTimer = () => {
+      if (remaining <= 0) {
+        clearInterval(qrTimerInterval);
+        timerBadge.textContent = 'QR EXPIRED';
+        timerBadge.style.color = '#F43F5E';
+        img.style.opacity = '0.28';
+        expiredActions.style.display = 'block';
+        setCheckoutStatus('Dynamic Payment QR expired before settlement. Please generate a fresh QR or checkout order.', false);
+        return;
+      }
+      const mins = String(Math.floor(remaining / 60)).padStart(2, '0');
+      const secs = String(remaining % 60).padStart(2, '0');
+      timerBadge.textContent = `Expires in ${mins}:${secs}`;
+      timerBadge.style.color = remaining <= 60 ? '#F59E0B' : '#00C985';
+      remaining -= 1;
+    };
+
+    updateTimer();
+    qrTimerInterval = setInterval(updateTimer, 1000);
+    setCheckoutStatus(`Dynamic Payment QR ${qr.payment_qr_id} ready (awaiting webhook or HMAC settlement — scanning alone does not mark paid).`, true);
+  } catch (err) {
+    setCheckoutStatus(err.message || 'Dynamic QR generation failed.', false);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Regenerate Dynamic QR';
+  }
+}
+</script>
+{% endblock %}

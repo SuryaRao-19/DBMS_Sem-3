@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Station Bookings — Partner Console{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <h1 style="margin:0 0 0.35rem 0;">Station Reservations &amp; Driver Check-Ins</h1>
+  <p class="page-subtitle" style="margin:0;">
+    Customer time slot reservations scheduled at your assigned charging hubs.
+  </p>
+</div>
+
+{% if bookings %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-responsive">
+      <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--color-border); background:rgba(8,14,26,0.5);">
+            <th style="padding:0.85rem 1rem; text-align:left;">Booking ID</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Station &amp; Dispenser</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Customer</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Vehicle</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Time Window</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Status</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Payment &amp; Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bookings %}
+            <tr style="border-bottom:1px solid var(--color-border);">
+              <td style="padding:0.85rem 1rem; font-weight:700;">#{{ b.booking_id }}</td>
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;">{{ b.station_name }}</div>
+                <div style="font-size:0.8rem; color:var(--accent-cyan);">
+                  Dispenser {{ b.point_code }} ({{ b.connector_type }})
+                </div>
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <div>{{ b.customer_name }}</div>
+                <div style="font-size:0.8rem; color:var(--text-dim);">{{ b.customer_phone or b.customer_email }}</div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem;">
+                <div>{{ b.make }} {{ b.model }}</div>
+                <div style="color:var(--text-dim);">{{ b.registration_no }}</div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem;">
+                <div><strong>Start:</strong> {{ b.start_at }}</div>
+                <div style="color:var(--text-dim);"><strong>End:</strong> {{ b.end_at }}</div>
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <span class="badge {% if b.booking_status == 'CONFIRMED' %}badge-success{% elif b.booking_status == 'CANCELLED' %}badge-danger{% elif b.booking_status == 'PENDING_PAYMENT' %}badge-warning{% else %}badge-info{% endif %}">
+                  {{ b.booking_status }}
+                </span>
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                {% if b.payment_status == 'PAYMENT_DUE' and b.payment_id %}
+                  <div style="margin-bottom:0.35rem;">
+                    <span class="badge badge-warning">CASH DUE: ₹{{ b.payment_amount }}</span>
+                  </div>
+                  <form method="POST" action="{{ url_for('owner.collect_cash_payment', payment_id=b.payment_id) }}" onsubmit="return confirm('Confirm offline cash collection of ₹{{ b.payment_amount }} for Booking #{{ b.booking_id }}?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.75rem; padding:0.25rem 0.6rem;">
+                      💵 Collect Cash
+                    </button>
+                  </form>
+                {% elif b.payment_status == 'SUCCESS' %}
+                  <span class="badge badge-success">PAID (₹{{ b.payment_amount }})</span>
+                {% else %}
+                  <span style="font-size:0.8rem; color:var(--text-dim);">{{ b.payment_status or 'N/A' }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">📅</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Active Reservations</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto;">
+      Driver slot reservations scheduled for your stations will be listed here in real time.
+    </p>
+  </div>
+{% endif %}
+{% endblock %}

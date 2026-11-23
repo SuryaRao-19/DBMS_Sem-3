@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Dispensers &amp; Tariffs — Partner Console{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.75rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">Charging Dispensers &amp; Tariffs</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Configure charging point power ratings, connector types, per-kWh tariffs, and operational states across your stations.
+    </p>
+  </div>
+  {% if stations %}
+    <button type="button" class="btn btn-primary btn-sm" onclick="openModal('addPointModal')">
+      <span>+</span> Add Dispenser
+    </button>
+  {% endif %}
+</div>
+
+{% if points %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-responsive">
+      <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--color-border); background:rgba(8,14,26,0.5);">
+            <th style="padding:0.85rem 1rem; text-align:left;">Dispenser</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Station</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Connector &amp; Power</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Tariff Rate</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Status</th>
+            <th style="padding:0.85rem 1rem; text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pt in points %}
+            <tr style="border-bottom:1px solid var(--color-border);">
+              <td style="padding:0.85rem 1rem; font-weight:700;">
+                <span style="color:var(--accent-cyan);">⚡ {{ pt.point_code }}</span>
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;">{{ pt.station_name }}</div>
+                <div style="font-size:0.8rem; color:var(--text-dim);">{{ pt.city }}</div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem;">
+                <div>{{ pt.connector_type }}</div>
+                <div style="color:var(--text-dim);">{{ pt.power_rating_kw }} kW</div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.9rem; font-weight:700; color:#10B981;">
+                ₹{{ "%.2f"|format(pt.tariff_per_kwh) }} / kWh
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <span class="badge {% if pt.point_status == 'AVAILABLE' %}badge-success{% elif pt.point_status == 'CHARGING' %}badge-info{% else %}badge-warning{% endif %}">
+                  {{ pt.point_status }}
+                </span>
+              </td>
+              <td style="padding:0.85rem 1rem; text-align:right;">
+                <button type="button" class="btn btn-xs btn-secondary" onclick="openEditPointModal({{ pt|tojson|forceescape }})">
+                  Configure
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">⚡🔌</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Dispensers Configured</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto 1.5rem auto;">
+      Add charging points and set per-kWh tariffs for your assigned charging stations.
+    </p>
+    {% if stations %}
+      <button type="button" class="btn btn-primary" onclick="openModal('addPointModal')">
+        + Add First Dispenser
+      </button>
+    {% else %}
+      <a href="{{ url_for('owner.apply') }}" class="btn btn-primary">Apply as a Station Partner</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+<!-- Add Dispenser Modal -->
+{% if stations %}
+<div class="modal-overlay" id="addPointModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; padding:1rem;">
+  <div class="card" style="max-width:500px; width:100%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+      <h3 style="margin:0; font-size:1.15rem;">Add Charging Dispenser</h3>
+      <button type="button" onclick="closeModal('addPointModal')" style="background:transparent; border:none; color:inherit; font-size:1.5rem; cursor:pointer;">&times;</button>
+    </div>
+
+    <form method="POST" action="{{ url_for('owner.point_create') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group">
+        <label class="form-label" for="pt_station_id">Select Station</label>
+        <select id="pt_station_id" name="station_id" class="form-control" required>
+          {% for st in stations %}
+            <option value="{{ st.station_id }}">{{ st.station_name }} ({{ st.city }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="pt_code">Dispenser Code</label>
+        <input type="text" id="pt_code" name="point_code" class="form-control" placeholder="e.g. CP-03" required style="text-transform:uppercase;">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="pt_connector">Connector</label>
+          <select id="pt_connector" name="connector_type" class="form-control">
+            <option value="CCS2" selected>CCS2 (DC Fast)</option>
+            <option value="TYPE2">Type 2 (AC Fast)</option>
+            <option value="CHADEMO">CHAdeMO</option>
+            <option value="BHARAT_DC001">Bharat DC-001</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="pt_power">Max Power (kW)</label>
+          <input type="number" id="pt_power" name="power_rating_kw" class="form-control" step="0.1" value="30.0" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="pt_tariff">Tariff Rate (₹ per kWh)</label>
+        <input type="number" id="pt_tariff" name="tariff_per_kwh" class="form-control" step="0.1" value="18.0" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:1.25rem;">
+        Add Dispenser
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Edit Dispenser Modal -->
+<div class="modal-overlay" id="editPointModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; padding:1rem;">
+  <div class="card" style="max-width:460px; width:100%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+      <h3 style="margin:0; font-size:1.15rem;">Configure Dispenser</h3>
+      <button type="button" onclick="closeModal('editPointModal')" style="background:transparent; border:none; color:inherit; font-size:1.5rem; cursor:pointer;">&times;</button>
+    </div>
+
+    <form method="POST" id="editPointForm" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group">
+        <label class="form-label" for="edit_point_code">Dispenser Code</label>
+        <input type="text" id="edit_point_code" class="form-control" disabled style="opacity:0.75;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="edit_point_tariff">Tariff Rate (₹ per kWh)</label>
+        <input type="number" id="edit_point_tariff" name="tariff_per_kwh" class="form-control" step="0.1" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="edit_point_status">Operational State</label>
+        <select id="edit_point_status" name="point_status" class="form-control">
+          <option value="AVAILABLE">AVAILABLE — Ready to Dispense</option>
+          <option value="UNDER_MAINTENANCE">UNDER_MAINTENANCE — Service Required</option>
+          <option value="OUT_OF_SERVICE">OUT_OF_SERVICE — Temporarily Down</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:1.25rem;">
+        Save Changes
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openEditPointModal(pt) {
+  const form = document.getElementById('editPointForm');
+  form.action = `/owner/points/${pt.point_id}/edit`;
+  document.getElementById('edit_point_code').value = pt.point_code;
+  document.getElementById('edit_point_tariff').value = pt.tariff_per_kwh;
+  document.getElementById('edit_point_status').value = pt.point_status;
+  openModal('editPointModal');
+}
+</script>
+{% endblock %}
+

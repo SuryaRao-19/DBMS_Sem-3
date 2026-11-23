@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}All Bookings - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>All Slot Reservations</h1>
+    <div class="page-subtitle">Complete log of customer reservations, station allocations, and fulfillment statuses</div>
+  </div>
+</div>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Booking ID</th>
+        <th>EV Owner</th>
+        <th>Vehicle</th>
+        <th>Station & Dispenser</th>
+        <th>Scheduled Window</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in bookings %}
+        <tr>
+          <td><span style="font-weight: 700; color: var(--text-dim);">#{{ b.booking_id }}</span></td>
+          <td>
+            <div style="font-weight: 600;">{{ b.user_name }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">{{ b.user_email }}</div>
+          </td>
+          <td>
+            <div style="font-weight: 600; color: var(--text-main);">{{ b.registration_no }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">{{ b.make }} {{ b.model }}</div>
+          </td>
+          <td>
+            <div style="font-weight: 600;">{{ b.station_name }}</div>
+            <div style="font-size: 0.75rem; color: var(--accent-cyan);">{{ b.point_code }} ({{ b.connector_type }})</div>
+          </td>
+          <td>
+            <div><strong>From:</strong> {{ b.start_at }}</div>
+            <div style="font-size: 0.8rem; color: var(--text-dim);"><strong>To:</strong> {{ b.end_at }}</div>
+          </td>
+          <td>
+            <span class="badge badge-{{ b.booking_status.lower() }}">{{ b.booking_status }}</span>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--text-dim);">No bookings recorded in database.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

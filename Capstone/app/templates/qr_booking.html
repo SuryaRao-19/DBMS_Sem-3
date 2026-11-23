@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Booking Check-In Pass #{{ booking_qr.booking_id }}{% endblock %}
+{% block breadcrumb_section %}QR Verification{% endblock %}
+{% block breadcrumb_current %}Booking #{{ booking_qr.booking_id }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card mx-auto" style="max-width: 680px; padding: 1.75rem;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+      <div>
+        <span class="badge {% if booking_qr.qr_status == 'ACTIVE' %}bg-success{% elif booking_qr.qr_status == 'USED' %}bg-info{% else %}bg-danger{% endif %}">
+          Booking QR: {{ booking_qr.qr_status }}
+        </span>
+        <h1 style="margin:0.35rem 0 0.2rem; font-size:1.45rem;">Reservation Check-In Pass #{{ booking_qr.booking_id }}</h1>
+        <div class="text-dim" style="font-size:0.85rem;">{{ booking_qr.station_name }} &mdash; {{ booking_qr.city }}</div>
+      </div>
+      <div class="text-dim" style="font-size:0.8rem; text-align:right;">
+        Booking Status: <strong>{{ booking_qr.booking_status }}</strong><br>
+        Token: <code>{{ booking_qr.qr_token[:12] }}&hellip;</code>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem; padding:1rem; border-radius:10px; background:rgba(15,23,42,0.55); border:1px solid var(--border-color); margin-bottom:1.1rem;">
+      <div><div class="text-dim" style="font-size:0.74rem;">DRIVER</div><strong>{{ booking_qr.full_name }}</strong></div>
+      <div><div class="text-dim" style="font-size:0.74rem;">VEHICLE</div><strong>{{ booking_qr.make }} {{ booking_qr.model }} ({{ booking_qr.registration_no }})</strong></div>
+      <div><div class="text-dim" style="font-size:0.74rem;">DISPENSER</div><strong>{{ booking_qr.point_code }} ({{ booking_qr.connector_type }})</strong></div>
+      <div><div class="text-dim" style="font-size:0.74rem;">TIME WINDOW</div><strong>{{ booking_qr.start_at }} &rarr; {{ booking_qr.end_at }}</strong></div>
+    </div>
+
+    <div class="alert alert-info" style="font-size:0.84rem; margin-bottom:1rem;">
+      Booking QR verification confirms reservation authenticity only; payment settlement uses server-verified Razorpay checkout records.
+      {% if booking_qr.verified_at %}<br><strong>Checked in at:</strong> {{ booking_qr.verified_at }}{% endif %}
+    </div>
+
+    <div style="display:flex; gap:0.65rem; flex-wrap:wrap; align-items:center;">
+      {% if current_user_role == 'ADMIN' and booking_qr.qr_status == 'ACTIVE' %}
+        <form method="POST" action="{{ url_for('public.checkin_booking_qr', token=booking_qr.qr_token) }}" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-primary">Verify Arrival &amp; Mark Checked-In</button>
+        </form>
+      {% endif %}
+      {% if current_user_role == 'ADMIN' %}
+        <a href="{{ url_for('admin.bookings') }}" class="btn btn-secondary">All Bookings</a>
+      {% else %}
+        <a href="{{ url_for('owner.bookings') }}" class="btn btn-secondary">My Bookings</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

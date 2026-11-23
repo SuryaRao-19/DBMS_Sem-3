@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy — EZ Charge Network Portal{% endblock %}
+{% block breadcrumb_section %}Legal &amp; Governance{% endblock %}
+{% block breadcrumb_current %}Privacy Policy{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1 class="page-title">Privacy &amp; Data Handling Policy</h1>
+    <div class="page-subtitle">EZ Charge Network Portal &mdash; Independent Academic Demonstration (EV ChargeNet)</div>
+  </div>
+</div>
+
+<div class="card" style="max-width:940px; display:flex; flex-direction:column; gap:1.15rem;">
+  <div class="disclaimer-banner">
+    <strong>Independent Academic Demonstration Notice:</strong> This portal is an educational database &amp; software engineering project modeled on publicly available Tata Power EZ Charge reference information. It is <strong>not</strong> affiliated with, endorsed by, or operated by The Tata Power Company Limited.
+  </div>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">1. Information Collection</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      We collect only the minimum information required to demonstrate EV charging workflows: account profile details when you register, vehicle specifications you enter, simulated booking and session logs, optional support enquiries submitted through the contact form, and server-side audit/QR scan counters.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">2. Account Information</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      Registered EV Owners provide their full name, email address, optional phone number, and password. Public self-registration strictly assigns the <code>OWNER</code> role; administrative accounts can only be provisioned by an existing administrator. Passwords are never stored in plaintext.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">3. Booking &amp; Charging Simulation Information</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      Vehicle registration details, charger dispenser selections, slot timestamps, and simulated energy metering (<code>kWh</code>) are stored in the project database solely to demonstrate conflict detection, pricing calculation, and demonstration receipt generation. No real EV chargers are controlled or monitored.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">4. Payment Demonstration Information</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      All checkout flows operate exclusively in <strong>Razorpay TEST MODE ONLY</strong> or local HMAC-SHA256 sandbox mode (live merchant keys <code>rzp_live_*</code> are blocked at runtime). We never collect or store real bank card numbers, CVVs, or real UPI PINs; stored ledger fields contain only test order/payment IDs, dynamic test QR tokens, expiry timestamps, and simulated INR/GST breakdown amounts.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">5. Contact Form Information</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      Messages submitted on <a href="{{ url_for('public.contact') }}">Contact Us</a> (name, email, optional phone, subject, category, message) along with request IP metadata used for rate limiting and spam prevention are validated by the Flask backend, archived in MySQL (<code>ContactMessages</code>), and optionally forwarded via server-configured Web3Forms credentials.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">6. Data Storage</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      Portal records reside in a relational MySQL 8.0+ InnoDB database. Seeded demonstration accounts (<code>@example.test</code>) and live user-submitted records are tracked distinctly via origin/demo indicators.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">7. Data Security</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      Security controls include Werkzeug password hashing (<code>scrypt</code>), parameterized SQL queries, global CSRF token enforcement, per-request account status verification, strict ownership checks (IDOR prevention), <code>HttpOnly</code> / <code>SameSite=Lax</code> session cookies (with <code>Secure</code> cookies and disabled debug mode in production), and server-side HMAC-SHA256 verification on payment callbacks.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">8. Third-Party Services</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      Depending on deployment environment configuration, the platform may connect to: <strong>Google Maps JavaScript API</strong> (or fallback Leaflet.js / OpenStreetMap tiles) for verified coordinate mapping, <strong>Razorpay Test APIs</strong> for test-mode checkout/QR payloads, and <strong>Web3Forms</strong> for backend enquiry delivery. Links to official Tata Power web pages and mobile app listings open externally under Tata Power's own terms and policies.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">9. User Rights</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      Authenticated users may review and update their profile details and password in <a href="{{ url_for('public.profile') }}">Profile Settings</a>, manage or remove registered demonstration vehicles, cancel eligible upcoming bookings, and request account deactivation or enquiry deletion from a system administrator.
+    </p>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem; margin-bottom:0.35rem;">10. Contact Information</h2>
+    <p class="text-muted" style="font-size:0.92rem;">
+      For questions about this academic demonstration portal or test dataset handling, submit an enquiry through our <a href="{{ url_for('public.contact') }}">Contact Us</a> page or review the <a href="{{ url_for('public.data_sources') }}">Data Source Register</a>. For official Tata Power EZ Charge commercial customer service, refer directly to Tata Power's published support channels (<code>1800 833 2233</code> / <code>evsupport@tatapower.com</code>).
+    </p>
+  </section>
+</div>
+{% endblock %}

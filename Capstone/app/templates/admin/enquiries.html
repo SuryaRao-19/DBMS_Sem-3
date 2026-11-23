@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Customer Enquiries — EV ChargeNet Admin{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem;">
+  <div>
+    <h1 class="page-title">Customer Enquiries</h1>
+    <p class="page-subtitle">Review incoming Contact Us submissions, track Web3Forms email delivery status, and manage resolution workflow.</p>
+  </div>
+  <form method="GET" action="{{ url_for('admin.enquiries') }}" style="display:flex; gap:0.5rem; align-items:center;">
+    <label for="status_filter" class="form-label" style="margin:0;">Status:</label>
+    <select id="status_filter" name="status" class="form-control" style="width:auto;" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      {% for st in valid_statuses %}
+        <option value="{{ st }}" {% if selected_status == st %}selected{% endif %}>{{ st }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="card">
+  {% if messages %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Sender</th>
+            <th>Category &amp; Subject</th>
+            <th>Message</th>
+            <th>Email Delivery</th>
+            <th>Workflow Status</th>
+            <th>Submitted</th>
+            <th>Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in messages %}
+          <tr>
+            <td>#{{ m.id }}</td>
+            <td>
+              <strong>{{ m.full_name }}</strong><br>
+              <span class="text-muted" style="font-size:0.82rem;">{{ m.email }}</span>
+              {% if m.phone %}
+                <br><span class="text-muted" style="font-size:0.8rem;">{{ m.phone }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge badge-info">{{ m.category }}</span><br>
+              <strong style="font-size:0.9rem;">{{ m.subject }}</strong>
+            </td>
+            <td style="max-width:300px; white-space:normal; font-size:0.85rem;">
+              {{ m.message }}
+            </td>
+            <td>
+              {% if m.email_delivery_status == 'SENT' %}
+                <span class="badge badge-success">SENT</span>
+              {% elif m.email_delivery_status == 'FAILED' %}
+                <span class="badge badge-danger" title="{{ m.email_error or 'Delivery failed' }}">FAILED</span>
+                {% if m.email_error %}
+                  <div class="text-muted" style="font-size:0.75rem; margin-top:0.2rem;">{{ m.email_error[:60] }}</div>
+                {% endif %}
+              {% else %}
+                <span class="badge badge-warning">PENDING</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if m.submission_status == 'RESOLVED' %}
+                <span class="badge badge-success">RESOLVED</span>
+              {% elif m.submission_status == 'IN_PROGRESS' %}
+                <span class="badge badge-warning">IN_PROGRESS</span>
+              {% else %}
+                <span class="badge badge-info">NEW</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.82rem; white-space:nowrap;">
+              {{ m.created_at.strftime('%Y-%m-%d %H:%M') if m.created_at else '—' }}
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.update_enquiry_status', message_id=m.id) }}" style="display:flex; gap:0.4rem; align-items:center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="submission_status" class="form-control" style="min-width:130px; padding:0.35rem 0.5rem; font-size:0.82rem;" aria-label="Status for enquiry #{{ m.id }}">
+                  {% for st in valid_statuses %}
+                    <option value="{{ st }}" {% if m.submission_status == st %}selected{% endif %}>{{ st }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted);">
+      <p style="font-size:1rem; margin-bottom:0.5rem;">No customer enquiries found{% if selected_status %} with status {{ selected_status }}{% endif %}.</p>
+      <a href="{{ url_for('public.contact') }}" class="btn btn-secondary btn-sm">Open Public Contact Form</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+

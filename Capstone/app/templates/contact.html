@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Contact Support — EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem;">
+  <div>
+    <h1 class="page-title">Contact &amp; Support</h1>
+    <p class="page-subtitle">Submit platform enquiries directly via our secure Web3Forms proxy, or inspect official Tata Power EZ Charge support references.</p>
+  </div>
+</div>
+
+<div class="grid-cols-2" style="gap:1.5rem; align-items:start;">
+  <div class="card">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h2 class="card-title" style="margin:0;">Send Platform Enquiry</h2>
+      <span class="badge badge-info">Web3Forms + MySQL</span>
+    </div>
+    <form id="contactForm" method="POST" action="{{ url_for('public.contact') }}" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+        <label for="botcheck">Leave this field empty</label>
+        <input type="text" id="botcheck" name="botcheck" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div id="contactClientError" class="alert alert-danger" role="alert" style="display:none; margin-bottom:1rem;"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="contact_full_name">Full Name <span style="color:var(--accent-rose)">*</span></label>
+          <input type="text" id="contact_full_name" name="full_name" class="form-control"
+                 required minlength="2" maxlength="120"
+                 value="{{ form_data.get('full_name', '') }}"
+                 placeholder="e.g., Aarav Mehta">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="contact_email">Email Address <span style="color:var(--accent-rose)">*</span></label>
+          <input type="email" id="contact_email" name="email" class="form-control"
+                 required maxlength="150"
+                 value="{{ form_data.get('email', '') }}"
+                 placeholder="you@example.com">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="contact_phone">Phone Number <span class="text-muted">(Optional)</span></label>
+          <input type="tel" id="contact_phone" name="phone" class="form-control"
+                 maxlength="25"
+                 value="{{ form_data.get('phone', '') }}"
+                 placeholder="+91 98765 43210">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="contact_category">Enquiry Category <span style="color:var(--accent-rose)">*</span></label>
+          <select id="contact_category" name="category" class="form-control" required>
+            <option value="">-- Select category --</option>
+            {% for cat in categories %}
+              <option value="{{ cat }}" {% if form_data.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="contact_subject">Subject <span style="color:var(--accent-rose)">*</span></label>
+        <input type="text" id="contact_subject" name="subject" class="form-control"
+               required minlength="3" maxlength="200"
+               value="{{ form_data.get('subject', '') }}"
+               placeholder="Brief summary of your enquiry">
+      </div>
+
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label class="form-label" for="contact_message">Message <span style="color:var(--accent-rose)">*</span></label>
+          <span id="messageCounter" class="text-muted" style="font-size:0.78rem;">0 / 2000</span>
+        </div>
+        <textarea id="contact_message" name="message" class="form-control" rows="5"
+                  required minlength="10" maxlength="2000"
+                  placeholder="Describe your question, Delhi NCR station name, or booking reference...">{{ form_data.get('message', '') }}</textarea>
+      </div>
+
+      <button type="submit" id="contactSubmitBtn" class="btn btn-primary btn-block">
+        <span id="contactBtnText">Submit Enquiry</span>
+      </button>
+    </form>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:1.25rem;">
+    {% if platform_operator %}
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem;">
+        <h2 style="margin:0; font-size:1.15rem;">Reference Operator Contact Channels</h2>
+        <span class="integrity-pill integrity-verified">VERIFIED INFO</span>
+      </div>
+      <p class="text-muted" style="font-size:0.82rem; margin-bottom:0.85rem;">
+        For real physical Tata Power EZ Charge hardware support, contact Tata Power directly through their verified official customer service channels (this website is an independent academic case study):
+      </p>
+      <div style="display:flex; flex-direction:column; gap:0.55rem; font-size:0.9rem;">
+        <div><strong>24x7 Helpline:</strong> <span style="color:var(--accent-emerald); font-weight:700;">{{ platform_operator.support_phone }}</span></div>
+        <div><strong>Support Email:</strong> <span>{{ platform_operator.support_email }}</span></div>
+        <div><strong>Official Portal:</strong> <a href="{{ platform_operator.official_website }}" target="_blank" rel="noopener noreferrer">{{ platform_operator.official_website }} &nearr;</a></div>
+      </div>
+
+      {% if social_links %}
+      <div style="margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--border-color);">
+        <div class="meta-label" style="margin-bottom:0.45rem;">Verified Corporate Social Channels</div>
+        <div class="social-bar">
+          {% for soc in social_links if soc.platform != 'YOUTUBE' and soc.display_label != 'YouTube' %}
+            <a href="{{ soc.url }}" target="_blank" rel="noopener noreferrer" class="social-pill" aria-label="Tata Power {{ soc.display_label }}">
+              {{ soc.display_label }} &nearr;
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card" style="padding:1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+        <h3 style="font-size:1rem; margin:0;">Delhi NCR Reference Network Map</h3>
+        <span id="contactMapStatus" class="text-muted" style="font-size:0.75rem;">Loading...</span>
+      </div>
+      <div id="contactMap"
+           class="ev-map-container compact"
+           data-ev-map
+           data-maps-key="{{ google_maps_api_key }}"
+           data-api-url="{{ url_for('api.stations_map_feed') }}"
+           data-status-target="contactMapStatus"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/ev_map.js') }}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("contactForm");
+  const msgEl = document.getElementById("contact_message");
+  const counterEl = document.getElementById("messageCounter");
+  const errBox = document.getElementById("contactClientError");
+  const submitBtn = document.getElementById("contactSubmitBtn");
+  const btnText = document.getElementById("contactBtnText");
+  let isSubmitting = false;
+
+  const updateCounter = () => {
+    if (msgEl && counterEl) counterEl.textContent = `${msgEl.value.length} / 2000`;
+  };
+  if (msgEl) {
+    updateCounter();
+    msgEl.addEventListener("input", updateCounter);
+  }
+
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      if (isSubmitting) {
+        e.preventDefault();
+        return;
+      }
+      errBox.style.display = "none";
+
+      const fullName = document.getElementById("contact_full_name").value.trim();
+      const email = document.getElementById("contact_email").value.trim();
+      const category = document.getElementById("contact_category").value.trim();
+      const subject = document.getElementById("contact_subject").value.trim();
+      const message = msgEl.value.trim();
+
+      let errMsg = "";
+      if (fullName.length < 2 || fullName.length > 120) {
+        errMsg = "Please enter your full name (2–120 characters).";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errMsg = "Please provide a valid email address.";
+      } else if (!category) {
+        errMsg = "Please select an enquiry category.";
+      } else if (subject.length < 3 || subject.length > 200) {
+        errMsg = "Please provide a subject (3–200 characters).";
+      } else if (message.length < 10 || message.length > 2000) {
+        errMsg = "Message must be between 10 and 2000 characters.";
+      }
+
+      if (errMsg) {
+        e.preventDefault();
+        errBox.textContent = errMsg;
+        errBox.style.display = "block";
+        return;
+      }
+
+      isSubmitting = true;
+      submitBtn.disabled = true;
+      btnText.textContent = "Sending Enquiry...";
+    });
+  }
+});
+</script>
+{% endblock %}

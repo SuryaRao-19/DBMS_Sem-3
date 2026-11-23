@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Charging History — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">Charging Session History</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Review your complete charging log, delivered energy, tariff calculations, and receipts.
+    </p>
+  </div>
+  <a href="{{ url_for('customer.history_export', start_date=start_date, end_date=end_date, search=search) }}" class="btn btn-secondary btn-sm">
+    <span>📥</span> Export CSV Log
+  </a>
+</div>
+
+<!-- Filters Bar -->
+<div class="card" style="margin-bottom:1.5rem; padding:1.25rem;">
+  <form method="GET" action="{{ url_for('customer.history') }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)) 100px; gap:0.85rem; align-items:end;">
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="search_input">Search</label>
+      <input type="text" id="search_input" name="search" class="form-control" placeholder="Station, Vehicle, Point" value="{{ search or '' }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="start_date">From Date</label>
+      <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date or '' }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="end_date">To Date</label>
+      <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date or '' }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="sort_select">Order</label>
+      <select id="sort_select" name="sort" class="form-control">
+        <option value="desc" {% if sort == 'desc' %}selected{% endif %}>Newest First</option>
+        <option value="asc" {% if sort == 'asc' %}selected{% endif %}>Oldest First</option>
+      </select>
+    </div>
+
+    <div style="display:flex; gap:0.4rem;">
+      <button type="submit" class="btn btn-primary" style="height:42px; width:100%;">Filter</button>
+      {% if search or start_date or end_date %}
+        <a href="{{ url_for('customer.history') }}" class="btn btn-secondary" style="height:42px; display:inline-flex; align-items:center;" title="Reset">&times;</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if sessions %}
+  <div class="card" style="padding:0; overflow:hidden; margin-bottom:1.5rem;">
+    <div class="table-responsive">
+      <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--color-border); background:rgba(8,14,26,0.5);">
+            <th style="padding:0.85rem 1rem; text-align:left;">Session ID</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Date &amp; Time</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Station &amp; Point</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Vehicle</th>
+            <th style="padding:0.85rem 1rem; text-align:right;">Energy</th>
+            <th style="padding:0.85rem 1rem; text-align:right;">Amount</th>
+            <th style="padding:0.85rem 1rem; text-align:center;">Status</th>
+            <th style="padding:0.85rem 1rem; text-align:right;">Receipt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sessions %}
+            <tr style="border-bottom:1px solid var(--color-border);">
+              <td style="padding:0.85rem 1rem; font-weight:700;">#{{ s.session_id }}</td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem; color:var(--text-dim);">
+                {{ s.start_time }}
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;">{{ s.station_name }}</div>
+                <div style="font-size:0.8rem; color:var(--accent-cyan);">
+                  Dispenser {{ s.point_code }} ({{ s.connector_type }})
+                </div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem;">
+                <div>{{ s.make }} {{ s.model }}</div>
+                <div style="color:var(--text-dim);">{{ s.registration_no }}</div>
+              </td>
+              <td style="padding:0.85rem 1rem; text-align:right; font-weight:600;">
+                {{ "%.2f"|format(s.energy_consumed_kwh or 0) }} kWh
+              </td>
+              <td style="padding:0.85rem 1rem; text-align:right; font-weight:700; color:#10B981;">
+                ₹{{ "%.2f"|format(s.total_cost or 0) }}
+              </td>
+              <td style="padding:0.85rem 1rem; text-align:center;">
+                <span class="badge {% if s.payment_status == 'PAID' %}badge-success{% elif s.session_status == 'IN_PROGRESS' %}badge-warning{% else %}badge-info{% endif %}">
+                  {{ s.payment_status or s.session_status }}
+                </span>
+              </td>
+              <td style="padding:0.85rem 1rem; text-align:right;">
+                <a href="{{ url_for('customer.session_detail', session_id=s.session_id) }}" class="btn btn-xs btn-secondary">
+                  View Receipt
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination Controls -->
+  {% if total_pages > 1 %}
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+      <span style="font-size:0.85rem; color:var(--text-dim);">
+        Showing Page {{ current_page }} of {{ total_pages }} ({{ total_count }} sessions total)
+      </span>
+      <div style="display:flex; gap:0.5rem;">
+        {% if current_page > 1 %}
+          <a href="{{ url_for('customer.history', page=current_page - 1, start_date=start_date, end_date=end_date, search=search, sort=sort) }}" class="btn btn-secondary btn-sm">
+            &larr; Previous
+          </a>
+        {% endif %}
+        {% if current_page < total_pages %}
+          <a href="{{ url_for('customer.history', page=current_page + 1, start_date=start_date, end_date=end_date, search=search, sort=sort) }}" class="btn btn-secondary btn-sm">
+            Next &rarr;
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">📜⚡</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Charging Sessions Found</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto 1.5rem auto;">
+      Sessions you complete or simulate will be permanently logged here with kWh delivered and financial receipts.
+    </p>
+    <a href="{{ url_for('customer.charging') }}" class="btn btn-primary">
+      Start a Charging Session
+    </a>
+  </div>
+{% endif %}
+{% endblock %}
+

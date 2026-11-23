@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Station Partner Applications — Admin Console{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">Station Partner Applications</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Review prospective commercial hosts and fleet hubs applying to join the EV ChargeNet ecosystem.
+    </p>
+  </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card" style="margin-bottom:1.5rem; padding:1.25rem;">
+  <form method="GET" action="{{ url_for('admin.owner_applications') }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)) 100px; gap:0.85rem; align-items:end;">
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="search_query">Search Applications</label>
+      <input type="text" id="search_query" name="q" class="form-control" placeholder="Search applicant, station, city..." value="{{ search_query or '' }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" for="status_select">Review Status</label>
+      <select id="status_select" name="status" class="form-control">
+        <option value="">All Applications</option>
+        <option value="PENDING" {% if selected_status == 'PENDING' %}selected{% endif %}>Pending Review</option>
+        <option value="APPROVED" {% if selected_status == 'APPROVED' %}selected{% endif %}>Approved Partners</option>
+        <option value="REJECTED" {% if selected_status == 'REJECTED' %}selected{% endif %}>Rejected</option>
+      </select>
+    </div>
+
+    <div style="display:flex; gap:0.4rem;">
+      <button type="submit" class="btn btn-primary" style="height:42px; width:100%;">Filter</button>
+      {% if selected_status or search_query %}
+        <a href="{{ url_for('admin.owner_applications') }}" class="btn btn-secondary" style="height:42px; display:inline-flex; align-items:center;" title="Reset">&times;</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if applications %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-responsive">
+      <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--color-border); background:rgba(8,14,26,0.5);">
+            <th style="padding:0.85rem 1rem; text-align:left;">App #</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Applicant &amp; Company</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Proposed Station</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Chargers / Power</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Status</th>
+            <th style="padding:0.85rem 1rem; text-align:left;">Submitted</th>
+            <th style="padding:0.85rem 1rem; text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for app in applications %}
+            <tr style="border-bottom:1px solid var(--color-border);">
+              <td style="padding:0.85rem 1rem; font-weight:700;">#{{ app.application_id }}</td>
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;">{{ app.applicant_name }}</div>
+                <div style="font-size:0.8rem; color:var(--text-dim);">
+                  {{ app.email }} &bull; {{ app.phone or '-' }}
+                </div>
+                {% if app.company_name %}
+                  <div style="font-size:0.75rem; color:var(--accent-cyan);">🏢 {{ app.company_name }}</div>
+                {% endif %}
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;">{{ app.station_name }}</div>
+                <div style="font-size:0.8rem; color:var(--text-dim);">
+                  📍 {{ app.city }}{% if app.state %}, {{ app.state }}{% endif %}
+                </div>
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.85rem;">
+                <div><strong>{{ app.proposed_chargers }}</strong> Dispensers</div>
+                <div style="color:var(--text-dim);">{{ app.power_capacity_kw }} kW</div>
+              </td>
+              <td style="padding:0.85rem 1rem;">
+                <span class="badge {% if app.application_status == 'APPROVED' %}badge-success{% elif app.application_status == 'REJECTED' %}badge-danger{% else %}badge-warning{% endif %}">
+                  {{ app.application_status }}
+                </span>
+                {% if app.reviewer_name %}
+                  <div style="font-size:0.72rem; color:var(--text-dim); margin-top:0.2rem;">
+                    by {{ app.reviewer_name }}
+                  </div>
+                {% endif %}
+              </td>
+              <td style="padding:0.85rem 1rem; font-size:0.82rem; color:var(--text-dim);">
+                {{ app.created_at }}
+              </td>
+              <td style="padding:0.85rem 1rem; text-align:right; white-space:nowrap;">
+                <button type="button" class="btn btn-xs btn-primary" onclick="openReviewModal({{ app|tojson|forceescape }})">
+                  Review &rarr;
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">📋</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Applications Found</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto;">
+      Station Partner applications submitted through the public portal will appear here for review and role upgrade.
+    </p>
+  </div>
+{% endif %}
+
+<!-- Review Modal -->
+<div class="modal-overlay" id="reviewAppModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; padding:1rem;">
+  <div class="card" style="max-width:540px; width:100%; max-height:90vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+      <h3 style="margin:0; font-size:1.15rem;" id="modalAppTitle">Review Partner Application</h3>
+      <button type="button" onclick="closeModal('reviewAppModal')" style="background:transparent; border:none; color:inherit; font-size:1.5rem; cursor:pointer;">&times;</button>
+    </div>
+
+    <form method="POST" id="reviewAppForm" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div style="padding:0.85rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); margin-bottom:1.25rem; font-size:0.85rem;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+          <span style="color:var(--text-dim);">Applicant:</span>
+          <strong id="modalApplicantName"></strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+          <span style="color:var(--text-dim);">Proposed Hub:</span>
+          <span id="modalStationInfo"></span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--text-dim);">Linked Account:</span>
+          <span id="modalLinkedUser"></span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="reviewAction">Decision Action</label>
+        <select id="reviewAction" name="action" class="form-control" required onchange="toggleStationAssign(this.value)">
+          <option value="APPROVED" selected>APPROVE — Upgrade user to OWNER role</option>
+          <option value="REJECTED">REJECT — Decline application with notes</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="assignStationGroup">
+        <label class="form-label" for="assign_station_id">Assign Existing Demonstration Station <span class="text-dim">(Optional)</span></label>
+        <select id="assign_station_id" name="assign_station_id" class="form-control">
+          <option value="">Do not assign a station now</option>
+          {% for st in stations %}
+            <option value="{{ st.station_id }}">{{ st.station_name }} ({{ st.city }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="admin_notes">Administrative Review Notes</label>
+        <textarea id="admin_notes" name="admin_notes" class="form-control" rows="3" placeholder="Enter notes or feedback for the applicant..."></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:1.25rem;">
+        Submit Review Decision
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openReviewModal(app) {
+  const form = document.getElementById('reviewAppForm');
+  form.action = `/admin/owner-applications/${app.application_id}/review`;
+  document.getElementById('modalAppTitle').textContent = `Review Application #${app.application_id}`;
+  document.getElementById('modalApplicantName').textContent = `${app.applicant_name} (${app.email})`;
+  document.getElementById('modalStationInfo').textContent = `${app.station_name} (${app.city}) &bull; ${app.proposed_chargers} chargers`;
+  document.getElementById('modalLinkedUser').textContent = app.user_id ? `User #${app.user_id} (${app.current_role || 'CUSTOMER'})` : 'Guest Application (matched by email)';
+  document.getElementById('reviewAction').value = app.application_status === 'REJECTED' ? 'REJECTED' : 'APPROVED';
+  document.getElementById('admin_notes').value = app.admin_notes || '';
+  toggleStationAssign(document.getElementById('reviewAction').value);
+  openModal('reviewAppModal');
+}
+
+function toggleStationAssign(action) {
+  const group = document.getElementById('assignStationGroup');
+  group.style.display = action === 'APPROVED' ? 'block' : 'none';
+}
+</script>
+{% endblock %}
+

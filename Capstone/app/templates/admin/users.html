@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - EV ChargeNet Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>User & Account Management</h1>
+    <p class="page-subtitle">Inspect registered EV owners and system administrators, enforce account status controls, and monitor user activity.</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('createUserModal')">+ Create User / Admin</button>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card" style="margin-bottom: 2rem;">
+  <form method="GET" action="{{ url_for('admin.users') }}" class="filter-form-grid">
+    <div class="form-group" style="margin-bottom: 0;">
+      <label class="form-label">Search Users</label>
+      <input type="text" name="q" class="form-control" placeholder="Search by name, email, or phone..." value="{{ search_query }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label class="form-label">Role Filter</label>
+      <select name="role" class="form-control">
+        <option value="">All Account Roles</option>
+        <option value="CUSTOMER" {% if selected_role in ('CUSTOMER', 'USER') %}selected{% endif %}>EV Customers (Drivers)</option>
+        <option value="OWNER" {% if selected_role == 'OWNER' %}selected{% endif %}>Station Partners (Owners)</option>
+        <option value="ADMIN" {% if selected_role == 'ADMIN' %}selected{% endif %}>Administrators</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label class="form-label">Account Status</label>
+      <select name="status" class="form-control">
+        <option value="">All Statuses</option>
+        <option value="ACTIVE" {% if selected_status == 'ACTIVE' %}selected{% endif %}>Active</option>
+        <option value="INACTIVE" {% if selected_status == 'INACTIVE' %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+      <button type="submit" class="btn btn-primary" style="flex: 1;">Filter Users</button>
+      {% if search_query or selected_role or selected_status %}
+        <a href="{{ url_for('admin.users') }}" class="btn btn-secondary">Reset</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Users Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div class="table-container" style="border: none;">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Full Name & Email</th>
+          <th>Phone</th>
+          <th>Role</th>
+          <th>Activity Counts</th>
+          <th>Status</th>
+          <th>Registered</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+          <tr>
+            <td class="font-mono text-dim">#{{ u.user_id }}</td>
+            <td>
+              <div style="font-weight: 600;">
+                <a href="{{ url_for('admin.user_detail', user_id=u.user_id) }}" style="color:var(--color-text-primary); text-decoration:none;">
+                  {{ u.full_name }}
+                </a>
+              </div>
+              <div class="text-dim" style="font-size: 0.8rem;">{{ u.email }}</div>
+            </td>
+            <td>{{ u.phone or '-' }}</td>
+            <td>
+              <span class="role-pill {{ 'customer' if u.role in ('CUSTOMER', 'USER') else u.role.lower() }}">
+                {{ 'CUSTOMER' if u.role == 'USER' else u.role }}
+              </span>
+            </td>
+            <td>
+              <div style="font-size: 0.8rem; display: flex; gap: 0.75rem;">
+                <span title="Registered Vehicles">🚗 {{ u.vehicle_count }}</span>
+                <span title="Reservations">📅 {{ u.booking_count }}</span>
+                <span title="Charging Sessions">⚡ {{ u.session_count }}</span>
+                {% if u.owned_station_count %}
+                  <span title="Owned Stations" style="color:var(--accent-cyan);">📍 {{ u.owned_station_count }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <span class="badge badge-{{ 'available' if u.account_status == 'ACTIVE' else 'unavailable' }}">
+                {{ u.account_status }}
+              </span>
+            </td>
+            <td style="font-size: 0.825rem; color: var(--text-muted);">
+              {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '-' }}
+            </td>
+            <td style="white-space:nowrap;">
+              <a href="{{ url_for('admin.user_detail', user_id=u.user_id) }}" class="btn btn-secondary btn-xs" style="margin-right:0.35rem;">
+                Inspect
+              </a>
+              {% if u.user_id == session.get('user_id') %}
+                <span class="text-dim" style="font-size: 0.8rem;">Current Admin</span>
+              {% else %}
+                <form method="POST" action="{{ url_for('admin.toggle_status', user_id=u.user_id) }}" style="display: inline;" onsubmit="return confirm('Change status for user {{ u.full_name }}?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  {% if u.account_status == 'ACTIVE' %}
+                    <button type="submit" class="btn btn-danger btn-xs">Deactivate</button>
+                  {% else %}
+                    <button type="submit" class="btn btn-secondary btn-xs" style="color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.4);">
+                      Activate
+                    </button>
+                  {% endif %}
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted" style="padding: 2.5rem;">
+              No users matching the selected criteria found.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Create User / Admin Modal -->
+<div id="createUserModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Provision User or Administrator</h3>
+      <button class="modal-close" onclick="closeModal('createUserModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin.create_user') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" name="full_name" class="form-control" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" name="phone" class="form-control" placeholder="+91 98765 43210">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Assigned Role</label>
+          <select name="role" class="form-control" required>
+            <option value="CUSTOMER" selected>EV Customer / Driver (CUSTOMER)</option>
+            <option value="OWNER">Station Partner / Host (OWNER)</option>
+            <option value="ADMIN">System Administrator (ADMIN)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Initial Password</label>
+          <input type="password" name="password" class="form-control" minlength="6" required>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

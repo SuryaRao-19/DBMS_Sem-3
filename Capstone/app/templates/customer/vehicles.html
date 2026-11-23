@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}My Vehicles — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.75rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">My Vehicles (Garage)</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Manage your registered electric vehicles, battery capacities, and preferred connector interfaces.
+    </p>
+  </div>
+  <button type="button" class="btn btn-primary btn-sm" onclick="openModal('addVehicleModal')">
+    <span>+</span> Add EV to Garage
+  </button>
+</div>
+
+<!-- Vehicles List Grid -->
+{% if vehicles %}
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1.25rem;">
+    {% for v in vehicles %}
+      <div class="card" style="border:1px solid {% if v.is_default %}var(--color-brand-secondary){% else %}var(--color-border){% endif %}; display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
+            <div>
+              <span class="badge badge-secondary" style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em;">
+                {{ v.vehicle_category or '4W_PASSENGER' }}
+              </span>
+              <h3 style="margin:0.25rem 0 0 0; font-size:1.15rem;">{{ v.make }} {{ v.model }}</h3>
+            </div>
+            {% if v.is_default %}
+              <span class="badge badge-success" style="font-size:0.72rem;">Primary EV</span>
+            {% endif %}
+          </div>
+
+          <div style="padding:0.75rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem; font-size:0.85rem;">
+              <span style="color:var(--text-dim);">Registration No:</span>
+              <strong>{{ v.registration_no }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem; font-size:0.85rem;">
+              <span style="color:var(--text-dim);">Battery Capacity:</span>
+              <strong>{{ v.battery_capacity_kwh }} kWh</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem; font-size:0.85rem;">
+              <span style="color:var(--text-dim);">Connector:</span>
+              <strong style="color:var(--accent-cyan);">{{ v.connector_type or 'CCS2' }}</strong>
+            </div>
+            {% if v.registration_year %}
+              <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+                <span style="color:var(--text-dim);">Model Year:</span>
+                <span>{{ v.registration_year }}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; padding-top:0.75rem; border-top:1px solid var(--color-border);">
+          {% if not v.is_default %}
+            <form method="POST" action="{{ url_for('customer.vehicle_set_default', vehicle_id=v.vehicle_id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-secondary btn-xs">Set Default</button>
+            </form>
+          {% endif %}
+          <button type="button" class="btn btn-secondary btn-xs" onclick="openEditModal({{ v|tojson|forceescape }})">
+            Edit
+          </button>
+          <form method="POST" action="{{ url_for('customer.vehicle_delete', vehicle_id=v.vehicle_id) }}" style="display:inline;" onsubmit="return confirm('Remove {{ v.make }} {{ v.model }} ({{ v.registration_no }}) from your garage?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger btn-xs">Delete</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">🚗⚡</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Electric Vehicles Registered Yet</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto 1.5rem auto;">
+      Add your EV to your garage to enable 1-click slot reservations, vehicle-charger compatibility checks, and automated charging telemetry.
+    </p>
+    <button type="button" class="btn btn-primary" onclick="openModal('addVehicleModal')">
+      + Register Your First EV
+    </button>
+  </div>
+{% endif %}
+
+<!-- Add Vehicle Modal -->
+<div class="modal-overlay" id="addVehicleModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; padding:1rem;">
+  <div class="card" style="max-width:500px; width:100%; max-height:90vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+      <h3 style="margin:0; font-size:1.15rem;">Add EV to Garage</h3>
+      <button type="button" onclick="closeModal('addVehicleModal')" style="background:transparent; border:none; color:inherit; font-size:1.5rem; cursor:pointer;">&times;</button>
+    </div>
+
+    <form method="POST" action="{{ url_for('customer.vehicle_add') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="add_make">Make / Manufacturer</label>
+          <input type="text" id="add_make" name="make" class="form-control" placeholder="e.g. Tata, Hyundai, MG" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add_model">Model</label>
+          <input type="text" id="add_model" name="model" class="form-control" placeholder="e.g. Nexon EV, Ioniq 5" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="add_reg">Registration Number</label>
+        <input type="text" id="add_reg" name="registration_no" class="form-control" placeholder="e.g. DL-01-EV-1234" required style="text-transform:uppercase;">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="add_battery">Battery Capacity (kWh)</label>
+          <input type="number" id="add_battery" name="battery_capacity_kwh" class="form-control" step="0.1" min="1" max="500" placeholder="e.g. 40.5" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add_category">Vehicle Category</label>
+          <select id="add_category" name="vehicle_category" class="form-control">
+            <option value="4W_PASSENGER" selected>Passenger Car (4W)</option>
+            <option value="4W_COMMERCIAL">Commercial / Fleet (4W)</option>
+            <option value="2W">Two-Wheeler (2W)</option>
+            <option value="3W">Three-Wheeler (3W)</option>
+            <option value="BUS">Electric Bus</option>
+            <option value="HEAVY">Heavy Commercial</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="add_connector">Connector Interface</label>
+          <select id="add_connector" name="connector_type" class="form-control">
+            <option value="CCS2" selected>CCS Type 2 (Standard DC)</option>
+            <option value="TYPE2">Type 2 (AC Fast)</option>
+            <option value="CHADEMO">CHAdeMO</option>
+            <option value="BHARAT_DC001">Bharat DC-001</option>
+            <option value="BHARAT_AC001">Bharat AC-001</option>
+            <option value="GB_T">GB/T</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add_year">Registration Year</label>
+          <input type="number" id="add_year" name="registration_year" class="form-control" min="2010" max="2030" placeholder="e.g. 2024">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:0.5rem;">
+        <label style="display:inline-flex; align-items:center; gap:0.5rem; font-size:0.88rem; cursor:pointer;">
+          <input type="checkbox" name="is_default" value="1" checked style="accent-color:var(--color-brand-secondary);">
+          Set as my primary default vehicle for bookings
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:1rem;">
+        Register Vehicle
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Vehicle Modal -->
+<div class="modal-overlay" id="editVehicleModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; padding:1rem;">
+  <div class="card" style="max-width:500px; width:100%; max-height:90vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+      <h3 style="margin:0; font-size:1.15rem;">Edit EV Details</h3>
+      <button type="button" onclick="closeModal('editVehicleModal')" style="background:transparent; border:none; color:inherit; font-size:1.5rem; cursor:pointer;">&times;</button>
+    </div>
+
+    <form method="POST" id="editVehicleForm" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="edit_make">Make</label>
+          <input type="text" id="edit_make" name="make" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit_model">Model</label>
+          <input type="text" id="edit_model" name="model" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="edit_reg">Registration Number</label>
+        <input type="text" id="edit_reg" name="registration_no" class="form-control" required style="text-transform:uppercase;">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="edit_battery">Battery Capacity (kWh)</label>
+          <input type="number" id="edit_battery" name="battery_capacity_kwh" class="form-control" step="0.1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit_category">Vehicle Category</label>
+          <select id="edit_category" name="vehicle_category" class="form-control">
+            <option value="4W_PASSENGER">Passenger Car (4W)</option>
+            <option value="4W_COMMERCIAL">Commercial / Fleet (4W)</option>
+            <option value="2W">Two-Wheeler (2W)</option>
+            <option value="3W">Three-Wheeler (3W)</option>
+            <option value="BUS">Electric Bus</option>
+            <option value="HEAVY">Heavy Commercial</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="edit_connector">Connector Interface</label>
+          <select id="edit_connector" name="connector_type" class="form-control">
+            <option value="CCS2">CCS Type 2 (Standard DC)</option>
+            <option value="TYPE2">Type 2 (AC Fast)</option>
+            <option value="CHADEMO">CHAdeMO</option>
+            <option value="BHARAT_DC001">Bharat DC-001</option>
+            <option value="BHARAT_AC001">Bharat AC-001</option>
+            <option value="GB_T">GB/T</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit_year">Registration Year</label>
+          <input type="number" id="edit_year" name="registration_year" class="form-control">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:0.5rem;">
+        <label style="display:inline-flex; align-items:center; gap:0.5rem; font-size:0.88rem; cursor:pointer;">
+          <input type="checkbox" id="edit_default" name="is_default" value="1" style="accent-color:var(--color-brand-secondary);">
+          Keep as primary default vehicle
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:1rem;">
+        Save Changes
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openEditModal(v) {
+  const form = document.getElementById('editVehicleForm');
+  form.action = `/customer/vehicles/${v.vehicle_id}/edit`;
+  document.getElementById('edit_make').value = v.make || '';
+  document.getElementById('edit_model').value = v.model || '';
+  document.getElementById('edit_reg').value = v.registration_no || '';
+  document.getElementById('edit_battery').value = v.battery_capacity_kwh || '';
+  document.getElementById('edit_category').value = v.vehicle_category || '4W_PASSENGER';
+  document.getElementById('edit_connector').value = v.connector_type || 'CCS2';
+  document.getElementById('edit_year').value = v.registration_year || '';
+  document.getElementById('edit_default').checked = !!v.is_default;
+  openModal('editVehicleModal');
+}
+</script>
+{% endblock %}
+

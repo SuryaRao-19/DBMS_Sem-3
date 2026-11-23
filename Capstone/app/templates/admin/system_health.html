@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Database & System Diagnostics - EV ChargeNet Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Database & System Health Diagnostics</h1>
+    <p class="page-subtitle">Real-time telemetry, MySQL 8.0 engine state, 3NF schema statistics, and stored procedure verification.</p>
+  </div>
+  <div>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm">&larr; Back to Dashboard</a>
+  </div>
+</div>
+
+<!-- KPI Status Banner -->
+<div class="grid-cols-4">
+  <div class="card stat-card">
+    <span class="stat-label">Database Engine</span>
+    <span class="stat-value" style="font-size: 1.5rem; color: var(--accent-emerald);">MySQL {{ health.mysql_version }}</span>
+    <span class="stat-subtext">InnoDB ACID Engine</span>
+  </div>
+
+  <div class="card stat-card cyan">
+    <span class="stat-label">Query Latency</span>
+    <span class="stat-value" style="font-size: 1.5rem; color: var(--accent-cyan);">{{ health.latency_ms }} ms</span>
+    <span class="stat-subtext">Connection roundtrip</span>
+  </div>
+
+  <div class="card stat-card indigo">
+    <span class="stat-label">Active Database</span>
+    <span class="stat-value" style="font-size: 1.5rem; color: var(--accent-indigo);">{{ health.database_name }}</span>
+    <span class="stat-subtext">Host: {{ health.host }}</span>
+  </div>
+
+  <div class="card stat-card amber">
+    <span class="stat-label">Relational Rows</span>
+    <span class="stat-value" style="font-size: 1.5rem; color: var(--accent-amber);">{{ health.total_records }}</span>
+    <span class="stat-subtext">Across {{ health.tables|length }} 3NF tables</span>
+  </div>
+</div>
+
+<!-- Relational Tables & Row Counts -->
+<div class="card" style="margin-bottom: 2rem;">
+  <h2>3NF Schema Entities & Record Populations</h2>
+  <p class="text-muted" style="margin-bottom: 1.25rem;">
+    Normalized relational structure strictly adhering to Third Normal Form with referential integrity foreign keys.
+  </p>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Table Name</th>
+          <th>Physical Engine</th>
+          <th>Row Count</th>
+          <th>Integrity Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tbl in health.tables %}
+          <tr>
+            <td class="font-mono" style="font-weight: 600;">{{ tbl.name }}</td>
+            <td>InnoDB</td>
+            <td style="font-weight: 700; color: var(--text-main);">{{ tbl.rows }} rows</td>
+            <td>
+              <span class="badge badge-available">NORMALIZED (3NF)</span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid-cols-2">
+  <!-- Stored Procedures & Functions -->
+  <div class="card">
+    <h2>Stored Routines (Phase 2)</h2>
+    <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.875rem;">
+      Server-side procedures and deterministic functions verified in <code>INFORMATION_SCHEMA</code>.
+    </p>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Routine Name</th>
+            <th>Type</th>
+            <th>Data Type / Return</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in health.routines %}
+            <tr>
+              <td class="font-mono" style="color: var(--accent-emerald); font-weight: 600;">{{ r.ROUTINE_NAME }}</td>
+              <td><span class="role-pill admin">{{ r.ROUTINE_TYPE }}</span></td>
+              <td style="font-size: 0.8rem; color: var(--text-muted);">{{ r.DTD_IDENTIFIER or 'PROCEDURE_PARAMS' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="text-muted text-center">No stored routines cataloged.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Triggers -->
+  <div class="card">
+    <h2>Integrity Triggers (Phase 2)</h2>
+    <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.875rem;">
+      Event-driven database constraints preventing overlap and state inconsistencies.
+    </p>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Trigger Name</th>
+            <th>Target Table</th>
+            <th>Timing & Event</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for trg in health.triggers %}
+            <tr>
+              <td class="font-mono" style="color: var(--accent-cyan); font-weight: 600;">{{ trg.TRIGGER_NAME }}</td>
+              <td class="font-mono">{{ trg.EVENT_OBJECT_TABLE }}</td>
+              <td><span class="badge badge-confirmed">{{ trg.ACTION_TIMING }} {{ trg.EVENT_MANIPULATION }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="text-muted text-center">No triggers cataloged.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Composite Indexes -->
+<div class="card" style="margin-top: 2rem;">
+  <h2>B-Tree Secondary Indexes (Phase 3 Optimization)</h2>
+  <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.875rem;">
+    Multi-column composite indexes optimizing lookup ranges, overlap checking, and analytical report aggregations.
+  </p>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Target Table</th>
+          <th>Index Identifier</th>
+          <th>Indexed Column Order</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for idx in health.indexes %}
+          <tr>
+            <td class="font-mono" style="font-weight: 600;">{{ idx.TABLE_NAME }}</td>
+            <td class="font-mono text-cyan">{{ idx.INDEX_NAME }}</td>
+            <td class="font-mono text-dim" style="font-size: 0.85rem;">{{ idx.columns }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="3" class="text-muted text-center">No secondary indexes cataloged.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

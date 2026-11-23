@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Saved Stations — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+  <div>
+    <h1 style="margin:0 0 0.35rem 0;">Saved Stations (Bookmarks)</h1>
+    <p class="page-subtitle" style="margin:0;">
+      Quick access to your preferred charging hubs, daily commute spots, and highway favorites.
+    </p>
+  </div>
+  <a href="{{ url_for('customer.stations') }}" class="btn btn-primary btn-sm">
+    <span>🔍</span> Explore More Stations
+  </a>
+</div>
+
+{% if saved_stations %}
+  <div class="station-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:1.25rem;">
+    {% for st in saved_stations %}
+      <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
+            <div>
+              <span class="badge badge-secondary" style="font-size:0.7rem; text-transform:uppercase;">
+                {{ st.operator_name or 'Tata Power EZ Charge' }}
+              </span>
+              <h3 style="margin:0.25rem 0 0 0; font-size:1.15rem;">
+                <a href="{{ url_for('public.station_detail', station_id=st.station_id) }}" style="color:var(--color-text-primary); text-decoration:none;">
+                  {{ st.station_name }}
+                </a>
+              </h3>
+            </div>
+            <form method="POST" action="{{ url_for('customer.saved_station_toggle', station_id=st.station_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-warning btn-xs" title="Remove bookmark" style="border-radius:50%; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; padding:0;">
+                ★
+              </button>
+            </form>
+          </div>
+
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.85rem;">
+            <span class="badge badge-outline-cyan">{{ st.city }}</span>
+            <span class="badge badge-success">{{ st.verification_status or 'VERIFIED' }}</span>
+          </div>
+
+          <p style="font-size:0.85rem; color:var(--text-dim); margin:0 0 0.85rem 0; line-height:1.4;">
+            📍 {{ st.address }}
+          </p>
+
+          <div style="font-size:0.82rem; color:var(--text-dim); padding:0.6rem; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); margin-bottom:1rem;">
+            Dispensers: <strong>{{ st.total_points }}</strong> &bull; Available: <strong style="color:#10B981;">{{ st.available_points or 0 }}</strong>
+            {% if st.min_tariff %}&bull; Tariff: <strong>₹{{ "%.2f"|format(st.min_tariff) }}/kWh</strong>{% endif %}
+          </div>
+        </div>
+
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; padding-top:0.75rem; border-top:1px solid var(--color-border);">
+          <a href="{{ url_for('public.station_detail', station_id=st.station_id) }}" class="btn btn-primary btn-sm" style="flex:1; text-align:center;">
+            View Station Hub
+          </a>
+          {% if st.latitude and st.longitude %}
+            <a href="https://www.google.com/maps/dir/?api=1&destination={{ st.latitude }},{{ st.longitude }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="Directions">
+              🧭 Directions
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="text-align:center; padding:3.5rem 1rem;">
+    <div style="font-size:2.5rem; margin-bottom:1rem;">⭐📍</div>
+    <h3 style="margin:0 0 0.5rem 0;">No Saved Stations Yet</h3>
+    <p style="color:var(--text-dim); max-width:440px; margin:0 auto 1.5rem auto;">
+      Bookmark your frequently visited charging hubs for quick access, directions, and instant slot reservations.
+    </p>
+    <a href="{{ url_for('customer.stations') }}" class="btn btn-primary">
+      Browse Stations to Bookmark
+    </a>
+  </div>
+{% endif %}
+{% endblock %}
+

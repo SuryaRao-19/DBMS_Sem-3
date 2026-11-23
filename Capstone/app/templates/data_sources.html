@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Data Source Register — EZ Charge Network Portal{% endblock %}
+{% block breadcrumb_section %}Governance{% endblock %}
+{% block breadcrumb_current %}Data Source Register{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem;">
+  <div class="page-header-title">
+    <h1 class="page-title">Data Source Register &amp; Transparency Log</h1>
+    <p class="page-subtitle">
+      Every displayed statistic, station location, and transaction ledger entry carries explicit provenance across four strict categories:
+      <strong>A. Official company disclosures</strong>, <strong>B. Third-party charging &amp; map APIs</strong>, <strong>C. Local academic demonstration records</strong>, and <strong>D. Simulated charging &amp; sandbox payment telemetry</strong>.
+    </p>
+  </div>
+  <a href="{{ url_for('public.about') }}" class="btn btn-secondary btn-sm">&larr; Back to About Us</a>
+</div>
+
+{% if api_overview is defined %}
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0.85rem; margin-bottom:1.25rem;">
+  {% for cat in api_overview.provenance_categories %}
+    <div class="card" style="padding:1rem;">
+      <span class="integrity-pill {{ cat.pill_class }}">{{ cat.title }}</span>
+      <div style="font-size:1.35rem; font-weight:800; margin:0.45rem 0 0.2rem;">
+        {{ cat.station_count if cat.station_count else (cat.operational_count if cat.operational_count is defined else cat.source_count) }} records
+      </div>
+      <div class="text-dim" style="font-size:0.78rem;">{{ cat.description }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Category &amp; Data Item</th>
+        <th>Source Reference</th>
+        <th>Published / Retrieved</th>
+        <th>Confidence &amp; Origin</th>
+        <th>Data Status</th>
+        <th>Linked Records</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for src in sources %}
+        <tr>
+          <td>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">
+              {{ src.category or 'NETWORK_METRIC' }} &bull; {{ src.source_type or 'PUBLIC_REFERENCE' }}
+            </div>
+            <strong>{{ src.data_item }}</strong>
+            {% if src.notes %}
+              <div class="text-muted" style="font-size:0.78rem; margin-top:0.2rem;">{{ src.notes }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <div>{{ src.source_name }}</div>
+            {% if src.source_url %}
+              <a href="{{ src.source_url }}" target="_blank" rel="noopener noreferrer" style="font-size:0.8rem;">Official Source &nearr;</a>
+            {% else %}
+              <span class="text-dim" style="font-size:0.8rem;">Internal Sandbox / N/A</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.82rem; white-space:nowrap;">
+            <div><strong>Pub:</strong> {{ src.published_at or src.verification_date }}</div>
+            <div class="text-muted"><strong>Retr:</strong> {{ src.retrieved_at or src.verification_date }}</div>
+          </td>
+          <td style="font-size:0.8rem;">
+            <div><strong>{{ src.confidence_level or 'HIGH' }}</strong></div>
+            <div class="text-muted"><code>{{ src.record_origin or 'OFFICIAL_COMPANY_SOURCE' }}</code></div>
+          </td>
+          <td><span class="integrity-pill integrity-{{ src.data_status.lower() }}">{{ src.data_status }}</span></td>
+          <td style="font-size:0.85rem; font-weight:600; text-align:center;">
+            {{ src.associated_record_count if src.associated_record_count is not none else 0 }}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--text-dim);">No data sources registered yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

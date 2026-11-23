@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice & Receipt #{{ receipt.session_id }} - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div class="no-print" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:0.5rem;">
+  <a href="{{ url_for('owner.history') }}" class="btn btn-secondary btn-sm">&larr; Back to Charging History</a>
+  <div style="display:flex; gap:0.5rem;">
+    <a href="{{ url_for('owner.download_receipt', session_id=receipt.session_id) }}" class="btn btn-secondary btn-sm">⬇ Download Receipt (.txt)</a>
+    <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">🖨️ Print / Save Receipt</button>
+  </div>
+</div>
+
+<div class="demo-payment-banner">
+  DEMO PAYMENT RECEIPT — NO REAL MONEY WILL BE CHARGED. (Academic Demonstration Transaction)
+</div>
+
+<!-- Printable Receipt Card -->
+<div class="card receipt-card" id="printableReceipt">
+  <!-- Receipt Header -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--border-color); padding-bottom: 1.5rem; margin-bottom: 1.5rem;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.5rem; font-weight: 800; color: #fff;">
+        <span style="color: var(--accent-emerald);">⚡</span> EV ChargeNet
+      </div>
+      <p class="text-dim" style="font-size: 0.85rem; margin-top: 0.25rem;">
+        Official Charging Session Receipt & Tax Statement
+      </p>
+    </div>
+
+    <div style="text-align: right;">
+      <div style="font-size: 1.25rem; font-weight: 800; color: var(--accent-emerald);">
+        INVOICE #INV-{{ receipt.session_id }}-{{ receipt.paid_at.strftime('%Y%m') if receipt.paid_at else '2026' }}
+      </div>
+      <div class="text-dim" style="font-size: 0.825rem; margin-top: 0.25rem;">
+        Date: {{ receipt.start_at.strftime('%d %b %Y, %H:%M') if receipt.start_at else '-' }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer & Station Two-Column Details -->
+  <div class="grid-cols-2" style="margin-bottom: 1.5rem; gap: 2rem;">
+    <div>
+      <span class="meta-label">Billed To (EV Owner)</span>
+      <h3 style="margin-top: 0.25rem; font-size: 1.15rem;">{{ receipt.customer_name }}</h3>
+      <p class="text-muted" style="font-size: 0.875rem;">Email: {{ receipt.customer_email }}</p>
+      {% if receipt.customer_phone %}
+        <p class="text-muted" style="font-size: 0.875rem;">Phone: {{ receipt.customer_phone }}</p>
+      {% endif %}
+      <div style="margin-top: 0.75rem;">
+        <span class="meta-label">Vehicle Registered</span>
+        <div style="font-weight: 600; font-size: 0.95rem;">
+          {{ receipt.make }} {{ receipt.model }} &bull; <span class="font-mono">{{ receipt.registration_no }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <span class="meta-label">Charging Station Hub</span>
+      <h3 style="margin-top: 0.25rem; font-size: 1.15rem;">{{ receipt.station_name }}</h3>
+      <p class="text-muted" style="font-size: 0.875rem;">{{ receipt.station_address }}, {{ receipt.station_city }}</p>
+      <div style="margin-top: 0.75rem;">
+        <span class="meta-label">Dispenser Point</span>
+        <div style="font-weight: 600; font-size: 0.95rem;">
+          {{ receipt.point_code }} ({{ receipt.connector_type }} &bull; {{ receipt.max_power_kw }} kW)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Timing & Metrics Breakdown -->
+  <div class="table-container" style="margin-bottom: 1.5rem;">
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Usage Telemetry</th>
+          <th>Unit Tariff</th>
+          <th style="text-align: right;">Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <strong>EV Fast Charging Service</strong>
+            <div class="text-dim" style="font-size: 0.8rem;">
+              Duration: {{ receipt.duration_minutes }} minutes &bull; 
+              {{ receipt.start_at.strftime('%H:%M') if receipt.start_at else '' }} to {{ receipt.end_at.strftime('%H:%M') if receipt.end_at else '' }}
+            </div>
+          </td>
+          <td class="font-mono">{{ "%.3f"|format(receipt.energy_kwh) }} kWh</td>
+          <td>₹{{ "%.2f"|format(receipt.tariff_per_kwh) }} / kWh</td>
+          <td style="text-align: right; font-weight: 700; font-size: 1.1rem; color: var(--accent-emerald);">
+            ₹{{ "%.2f"|format(receipt.total_cost) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Total Summary & Payment Status -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+    <div>
+      <span class="meta-label">Demo Payment Settlement</span>
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem;">
+        <span class="badge badge-{{ (receipt.payment_status or 'SUCCESS').lower() }}">DEMO {{ receipt.payment_status or 'PAID' }}</span>
+        <span style="font-size: 0.9rem; font-weight: 600;">Method: {{ receipt.payment_method or 'UPI' }}</span>
+      </div>
+      <div class="text-dim font-mono" style="font-size: 0.8rem; margin-top: 0.35rem;">
+        Transaction Ref: {{ receipt.transaction_reference or 'EVTXN-DEMO' }}
+        &bull; Booking Ref: {{ ('#' ~ receipt.booking_id) if receipt.booking_id else 'Walk-In Session' }}
+      </div>
+    </div>
+
+    <div style="text-align: right;">
+      <span class="meta-label">Demo Total Settled</span>
+      <div style="font-size: 2rem; font-weight: 900; color: var(--accent-emerald); line-height: 1.2;">
+        ₹{{ "%.2f"|format(receipt.total_cost) }}
+      </div>
+      <span class="text-dim" style="font-size: 0.8rem;">Simulated Academic Ledger Record</span>
+    </div>
+  </div>
+
+  <!-- Footer Disclaimer -->
+  <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px dashed var(--border-color); text-align: center;" class="text-dim">
+    <p style="font-size: 0.775rem;">
+      DEMO RECEIPT ONLY — Strictly for academic demonstration in EV ChargeNet. Not a tax invoice or real bank/merchant settlement.
+      <a href="{{ url_for('public.contact') }}" style="color:var(--accent-emerald);">Submit Platform Enquiry</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

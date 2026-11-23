@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Reserve Charging Slot - EV ChargeNet{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 2rem auto;">
+  <div class="card" style="padding: 2rem;">
+    <div style="margin-bottom: 1.5rem;">
+      <a href="{{ url_for('owner.stations') }}" style="font-size: 0.85rem; color: var(--text-dim);">&larr; Back to Stations</a>
+      <h2 style="margin-top: 0.5rem;">Reserve Charging Slot</h2>
+      <p class="page-subtitle">Guaranteed time-slot reservation with automated collision prevention</p>
+    </div>
+
+    <!-- Selected Dispenser Specs -->
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+        <div>
+          <div style="font-weight: 800; font-size: 1.2rem; color: var(--accent-emerald);">{{ point.point_code }}</div>
+          <div style="font-size: 0.85rem; color: #fff;">{{ point.station_name }} &bull; {{ point.city }}</div>
+          <div style="font-size: 0.75rem; color: var(--text-dim);">{{ point.address }}</div>
+        </div>
+        <span class="badge badge-{{ point.point_status.lower() }}">{{ point.point_status }}</span>
+      </div>
+      <div style="display: flex; gap: 1.5rem; margin-top: 0.75rem; font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+        <div>Connector: <strong>{{ point.connector_type }}</strong></div>
+        <div>Power: <strong>{{ point.max_power_kw }} kW</strong></div>
+        <div>Tariff: <strong style="color:#34d399;">₹{{ "%.2f"|format(point.tariff_per_kwh) }}/kWh</strong></div>
+      </div>
+    </div>
+
+    <form method="POST" id="bookingForm" action="{{ url_for('owner.book_slot', point_id=point.point_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Select Your Vehicle</label>
+        <select name="vehicle_id" class="form-control" required>
+          {% for v in vehicles %}
+            <option value="{{ v.vehicle_id }}">
+              {{ v.make }} {{ v.model }} ({{ v.registration_no }}) - {{ v.battery_capacity_kwh }} kWh
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Start Time</label>
+          <input type="datetime-local" id="start_at" name="start_at" class="form-control" required onchange="checkSlotAvailability()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">End Time</label>
+          <input type="datetime-local" id="end_at" name="end_at" class="form-control" required onchange="checkSlotAvailability()">
+        </div>
+      </div>
+
+      <div id="availabilityNotice" style="display: none; padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem; margin-bottom: 1rem;"></div>
+
+      <!-- Estimated Session Charge Preview (ESTIMATED / DEMO) -->
+      <div id="estimateBox" style="display: none; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.35); border-radius: var(--radius-md); padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.84rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+          <strong>Estimated Session Preview</strong>
+          <span class="integrity-pill integrity-estimated">ESTIMATED</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+          <span>Duration: <strong id="estDuration">—</strong></span>
+          <span>Est. Energy: <strong id="estEnergy">—</strong></span>
+          <span>Est. Charge: <strong id="estCost" style="color:#34d399;">—</strong></span>
+        </div>
+        <div class="text-dim" style="font-size:0.74rem; margin-top:0.35rem;">
+          Estimated using demo rate (₹{{ "%.2f"|format(point.tariff_per_kwh) }}/kWh at {{ point.max_power_kw }} kW peak). Actual operator tariffs &amp; charging curves vary.
+        </div>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn btn-primary btn-block" style="margin-top: 0.5rem;">
+        Confirm Slot Reservation
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  const PEAK_KW = parseFloat("{{ point.max_power_kw }}") || 30;
+  const TARIFF_RATE = parseFloat("{{ point.tariff_per_kwh }}") || 18;
+
+  function updateChargeEstimate() {
+    const startVal = document.getElementById('start_at').value;
+    const endVal = document.getElementById('end_at').value;
+    const box = document.getElementById('estimateBox');
+    if (!startVal || !endVal || !box) return;
+
+    const sDate = new Date(startVal);
+    const eDate = new Date(endVal);
+    const diffHours = (eDate - sDate) / (1000 * 60 * 60);
+    if (diffHours <= 0) {
+      box.style.display = 'none';
+      return;
+    }
+    const mins = Math.round(diffHours * 60);
+    const estKwh = Math.min(PEAK_KW * diffHours * 0.75, 75.0);
+    const estRupees = estKwh * TARIFF_RATE;
+    document.getElementById('estDuration').textContent = `${mins} mins`;
+    document.getElementById('estEnergy').textContent = `${estKwh.toFixed(1)} kWh`;
+    document.getElementById('estCost').textContent = `₹${estRupees.toFixed(2)}`;
+    box.style.display = 'block';
+  }
+  // Set default start time to today + 1 hour, end time to start + 1 hour
+  window.addEventListener('DOMContentLoaded', () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    now.setMinutes(0, 0, 0);
+    const startStr = now.toISOString().slice(0, 16);
+
+    const end = new Date(now.getTime() + 60 * 60 * 1000);
+    const endStr = end.toISOString().slice(0, 16);
+
+    document.getElementById('start_at').value = startStr;
+    document.getElementById('end_at').value = endStr;
+    checkSlotAvailability();
+  });
+
+  async function checkSlotAvailability() {
+    updateChargeEstimate();
+    const start = document.getElementById('start_at').value;
+    const end = document.getElementById('end_at').value;
+    const notice = document.getElementById('availabilityNotice');
+    const btn = document.getElementById('submitBtn');
+
+    if (!start || !end) return;
+
+    if (new Date(end) <= new Date(start)) {
+      notice.style.display = 'block';
+      notice.style.background = 'rgba(244, 63, 94, 0.15)';
+      notice.style.color = '#fb7185';
+      notice.innerHTML = '⚠️ End time must be strictly after start time.';
+      btn.disabled = true;
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/check-overlap?point_id={{ point.point_id }}&start_at=${encodeURIComponent(start)}&end_at=${encodeURIComponent(end)}`);
+      const data = await res.json();
+
+      notice.style.display = 'block';
+      if (data.available) {
+        notice.style.background = 'rgba(16, 185, 129, 0.15)';
+        notice.style.color = '#34d399';
+        notice.innerHTML = '✅ Slot is available! No overlapping reservation detected.';
+        btn.disabled = false;
+      } else {
+        notice.style.background = 'rgba(244, 63, 94, 0.15)';
+        notice.style.color = '#fb7185';
+        notice.innerHTML = '❌ Conflict: Another confirmed reservation exists during this window.';
+        btn.disabled = true;
+      }
+    } catch (e) {
+      notice.style.display = 'none';
+      btn.disabled = false;
+    }
+  }
+</script>
+{% endblock %}

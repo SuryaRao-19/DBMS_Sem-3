@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Receipt — Session #{{ receipt.session_id }} — EZ Charge Network Portal{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <a href="{{ url_for('customer.history') }}" style="font-size:0.85rem; color:var(--text-dim); text-decoration:none;">&larr; Back to History</a>
+  <h1 style="margin:0.35rem 0 0 0;">Charging Session Receipt</h1>
+  <p class="page-subtitle" style="margin:0;">
+    Official demonstration invoice and energy ledger for Session #{{ receipt.session_id }}.
+  </p>
+</div>
+
+<div class="card" style="max-width:700px; margin:0 auto; padding:2rem;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid var(--color-border); padding-bottom:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <div style="font-size:0.8rem; font-weight:700; color:var(--accent-cyan); text-transform:uppercase; letter-spacing:0.04em;">
+        EV ChargeNet &bull; Demonstration Invoice
+      </div>
+      <h2 style="margin:0.25rem 0 0 0; font-size:1.4rem;">INV-{{ receipt.session_id }}</h2>
+      <div style="font-size:0.85rem; color:var(--text-dim); margin-top:0.25rem;">
+        Session #{{ receipt.session_id }} &bull; {{ receipt.start_time }}
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <span class="badge {% if receipt.payment_status == 'PAID' %}badge-success{% else %}badge-info{% endif %}" style="font-size:0.85rem; padding:4px 10px;">
+        {{ receipt.payment_status or 'PAID' }}
+      </span>
+      <div style="font-size:0.8rem; color:var(--text-dim); margin-top:0.35rem;">
+        Ref: {{ receipt.transaction_reference or 'N/A' }}
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.5rem; font-size:0.88rem;">
+    <div>
+      <strong style="color:var(--text-dim); display:block; margin-bottom:0.25rem;">STATION LOCATION</strong>
+      <div>{{ receipt.station_name }}</div>
+      <div style="color:var(--text-dim);">{{ receipt.address }}</div>
+      <div style="color:var(--text-dim);">{{ receipt.city }}</div>
+    </div>
+    <div>
+      <strong style="color:var(--text-dim); display:block; margin-bottom:0.25rem;">VEHICLE &amp; DISPENSER</strong>
+      <div>{{ receipt.make }} {{ receipt.model }} ({{ receipt.registration_no }})</div>
+      <div style="color:var(--text-dim);">Dispenser {{ receipt.point_code }} &bull; {{ receipt.connector_type }}</div>
+    </div>
+  </div>
+
+  <div style="padding:1rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); margin-bottom:1.5rem; font-size:0.9rem;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+      <span style="color:var(--text-dim);">Energy Consumed:</span>
+      <strong>{{ "%.3f"|format(receipt.energy_kwh or receipt.energy_consumed_kwh or 0) }} kWh</strong>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+      <span style="color:var(--text-dim);">Tariff Rate:</span>
+      <span>₹{{ "%.2f"|format(receipt.tariff_per_kwh or receipt.rate_per_kwh or 0) }} / kWh</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+      <span style="color:var(--text-dim);">Payment Method:</span>
+      <span>{{ receipt.payment_method or 'Razorpay Test Mode (Simulated)' }}</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; padding-top:0.75rem; border-top:1px solid var(--color-border); font-size:1.15rem;">
+      <strong>Total Amount:</strong>
+      <strong style="color:#10B981;">₹{{ "%.2f"|format(receipt.total_cost or 0) }}</strong>
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+    <a href="{{ url_for('customer.session_download_receipt', session_id=receipt.session_id) }}" class="btn btn-secondary btn-sm">
+      📥 Download Text Receipt
+    </a>
+    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+      🖨️ Print Invoice
+    </button>
+  </div>
+</div>
+{% endblock %}
+

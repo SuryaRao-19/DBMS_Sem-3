@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Data Source Register — Admin Governance{% endblock %}
+{% block breadcrumb_section %}Analytics &amp; Governance{% endblock %}
+{% block breadcrumb_current %}Data Sources{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem;">
+  <div class="page-header-title">
+    <h1 class="page-title">Data Source &amp; Integrity Register</h1>
+    <p class="page-subtitle">Manage verification status, provenance governance (Categories A/B/C/D), and external EV directory sync.</p>
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    <form method="POST" action="{{ url_for('admin.sync_ocm_stations_route') }}" style="margin:0;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next_endpoint" value="admin.admin_data_sources">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-rotate"></i> Sync Open Charge Map (NCR)
+      </button>
+    </form>
+    <a href="{{ url_for('public.data_sources') }}" class="btn btn-secondary btn-sm">Public Transparency View &rarr;</a>
+  </div>
+</div>
+
+{% if api_overview is defined %}
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:0.85rem; margin-bottom:1.25rem;">
+  {% for cat in api_overview.provenance_categories %}
+    <div class="card" style="padding:0.95rem;">
+      <span class="integrity-pill {{ cat.pill_class }}">{{ cat.title }}</span>
+      <div style="font-size:1.3rem; font-weight:800; margin:0.4rem 0 0.15rem;">
+        {{ cat.station_count }} station(s) &bull; {{ cat.source_count }} source(s)
+      </div>
+      <div class="text-dim" style="font-size:0.78rem;">{{ cat.description }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Category &amp; Data Item</th>
+        <th>Source &amp; Origin</th>
+        <th>Published / Retrieved</th>
+        <th>Confidence &amp; Count</th>
+        <th>Current Status</th>
+        <th>Admin Status Transition &amp; Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for src in sources %}
+        <tr>
+          <td>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">
+              {{ src.category or 'NETWORK_METRIC' }} &bull; {{ src.source_type or 'PUBLIC_REFERENCE' }}
+            </div>
+            <strong>{{ src.data_item }}</strong>
+            {% if src.notes %}
+              <div class="text-muted" style="font-size:0.78rem; margin-top:0.2rem;">{{ src.notes }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <div>{{ src.source_name }}</div>
+            {% if src.source_url %}
+              <a href="{{ src.source_url }}" target="_blank" rel="noopener noreferrer" style="font-size:0.78rem;">Source Link &nearr;</a>
+            {% endif %}
+            <div class="text-muted" style="font-size:0.76rem; margin-top:0.15rem;"><code>{{ src.record_origin or 'OFFICIAL_COMPANY_SOURCE' }}</code></div>
+          </td>
+          <td style="font-size:0.8rem; white-space:nowrap;">
+            <div><strong>Pub:</strong> {{ src.published_at or src.verification_date }}</div>
+            <div class="text-muted"><strong>Retr:</strong> {{ src.retrieved_at or src.verification_date }}</div>
+          </td>
+          <td style="font-size:0.82rem;">
+            <div><strong>{{ src.confidence_level or 'HIGH' }}</strong></div>
+            <div class="text-muted">{{ src.associated_record_count if src.associated_record_count is not none else 0 }} record(s)</div>
+          </td>
+          <td>
+            <span class="integrity-pill integrity-{{ src.data_status.lower() }}">{{ src.data_status }}</span>
+          </td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.update_data_source_route', source_id=src.source_id) }}" style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <select name="data_status" class="form-control" style="min-width:130px; padding:0.35rem 0.5rem; font-size:0.8rem;">
+                {% for st in valid_statuses %}
+                  <option value="{{ st }}" {% if src.data_status == st %}selected{% endif %}>{{ st }}</option>
+                {% endfor %}
+              </select>
+              <input type="text" name="notes" value="{{ src.notes or '' }}" placeholder="Verification notes..." class="form-control" style="max-width:180px; padding:0.35rem 0.5rem; font-size:0.8rem;">
+              <button type="submit" class="btn btn-primary btn-sm">Update</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--color-text-secondary);">No data sources registered.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
