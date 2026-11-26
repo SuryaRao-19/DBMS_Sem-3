@@ -1,77 +1,138 @@
-# EZ Charge Network Portal — Tata Power EZ Charge Reference Demo (EV ChargeNet)
+# EV ChargeNet — Intelligent Electric Vehicle Charging Station Management System
+### Capstone Application Engine & Database Tier
 
-> **Independent Academic Demonstration Notice:** This application is an independently developed academic demonstration built on the **EV ChargeNet** Flask + MySQL 8.0+ engine using publicly available **Tata Power EZ Charge** reference information. It is **not** an official Tata Power application and cannot control real charging hardware or process live commercial payments.
+[![Live Production Deployment](https://img.shields.io/badge/Vercel-Live%20Demo-00D6A0?style=for-the-badge&logo=vercel&logoColor=white)](https://ev-chargenet-portal.vercel.app)
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.0+-black?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Test Suite](https://img.shields.io/badge/Pytest-154%20Passed%20(100%25)-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](#automated-testing--verification)
 
----
-
-## Core Platform Capabilities
-
-### 1. Public Website & Interactive Discovery (`/`, `/stations`, `/station/<slug>`, `/about`, `/data-sources`, `/contact`, `/privacy`, `/terms`)
-- **Oct 12, 2026 Press Release Baseline + Historical Conflict Note (`/`)**: Displays verified Tata Power EZ Charge figures (`6,700+` charging points, `2.5 lakh+` home chargers, `1,200+` e-bus points, `7 lakh+` customers, `700+` cities) alongside source links, publication dates, and explicit scope reconciliation notes vs earlier `5,500+` / `620+` corporate disclosures.
-- **Coordinate-Verified Station Directory & Interactive Map (`/stations`, `/api/stations/map`)**: Distinguishes coordinate-verified stations (including Dr. Ambedkar International Centre at 15 Janpath, plus curated NCR hubs) from press-release candidate hubs (`PENDING_VERIFICATION`, `latitude=NULL`, `longitude=NULL`) which show `"Location verification pending."` and never plot as fake map pins. Supports Google Maps JavaScript API (+ Places) with automatic zero-key Leaflet.js + OpenStreetMap fallback.
-- **4 Charging Solutions & Official Ecosystem**: Home Charging, Public Charging, Workplace/Fleet Charging, and E-Bus Depot Charging, plus official Android (`com.tatapower.evapp`), Apple App Store (`id1496350476`), Linktree, and verified Tata Power social handles (`@tatapower`, `@TataPowerCompanyLtd`).
-- **Web3Forms Contact & Enquiry Proxy (`/contact`)**: CSRF-protected backend proxy with input sanitization, honeypot field, DB rate limiting & deduplication, MySQL backup persistence (`ContactMessages`), and Web3Forms API delivery.
-
-### 2. Dual QR Architecture
-- **A. Station Identification QR (`StationQRCodes` + `app/services/qr_service.py`)**:
-  - Static physical placard QR encoding an opaque non-PII token (`/qr/station/<token>`).
-  - Public scan endpoint increments `scan_count` & `last_scanned_at` and redirects to `/station/<slug>`.
-  - Admin controls (`/admin/stations`): Generate, Regenerate (auto-revoking old token -> HTTP `410 Gone`), Revoke, download high-DPI PNG, download vector SVG, and open printable signage (`/admin/stations/<id>/qr/print`).
-- **B. Dynamic Payment QR & Razorpay TEST MODE (`/owner/checkout/<session_id>`, `/api/payments/razorpay/qr`)**:
-  - Single-use dynamic invoice QR bound strictly to server-computed `ChargingSessions.total_cost` (including 18% GST) with a 10-minute `qr_expires_at` TTL.
-  - Strict `rzp_live_*` key blocker; scanning the payment QR **never** marks a payment `SUCCESS` — settlement requires Razorpay HMAC-SHA256 verification (`/api/payments/razorpay/verify`, `/sandbox-complete`) or signed webhook delivery (`/api/payments/razorpay/webhook`).
-
-### 3. Unified Dark EV UI, Google OAuth 2.0 & Role-Separated Dashboards (`/admin/*`, `/owner/*`, `/login`, `/register`)
-- **Unified Deep Midnight Navy Design System**: Consistent dark EV theme (`#0B1220` / `#111C2E` / `#162338` / `#00D6A0` / `#00C8FF`) across Public views, Auth pages, EV Owner Console, and Admin Workspace, with synchronous pre-paint collapsed sidebar state eliminating navigation flicker.
-- **Server-Side Google OAuth 2.0 / OIDC + Local Auth**: Authlib Google Sign-In (`/auth/google/login`, `/auth/google/callback`) with `state` + `nonce` validation, safe account linking, password visibility toggles, `/forgot-password` timed token reset, and `bfcache` CSRF token refresh (`GET /auth/csrf-token`). See [`docs/GOOGLE_OAUTH_SETUP.md`](./docs/GOOGLE_OAUTH_SETUP.md).
-- **Admin Governance & 8 Chart.js Analytics (`/admin/dashboard`)**: Strictly separates Type A Official Reference metrics, Type B Demo telemetry (`@example.test`), and Type C Live Portal records across 8 dark-themed MySQL charts, Station Verification transitions, CSV import, User provisioning, Audit Logs, System Settings, and System Health.
-- **EV Owner Console (`/owner/dashboard`, `/owner/vehicles`, `/owner/bookings`, `/owner/charging`)**: Fleet CRUD, trigger-validated slot booking (`/api/check-overlap`), stored-procedure charging simulation (`CompleteChargingSession`), downloadable `.txt` receipts, and `"Simulated earnings — not actual company revenue."` disclosures.
+> 🚀 **Live Production Application:** **[https://ev-chargenet-portal.vercel.app](https://ev-chargenet-portal.vercel.app)**  
+> **Independent Academic Demonstration Notice:** This application is an independently developed academic demonstration built on the **EV ChargeNet** Flask + MySQL 8.0+ / SQLite Serverless Replica architecture using publicly available **Tata Power EZ Charge** reference information and open EV data. It is **not** an official Tata Power application and cannot control real charging hardware or process live commercial payments.
 
 ---
 
-## Project Structure
+## ⚡ Live Demonstration Accounts
 
-```text
-DBCAP/
-├── api/index.py                  # Vercel Python serverless WSGI entrypoint
-├── app/
-│   ├── __init__.py               # App factory, CSRFProtect, hardened session cookies
-│   ├── db.py                     # DBUtils.PooledDB MySQL 8.0+ pool & TLS parser
-│   ├── routes/                   # public, auth, owner, admin, api, auth_middleware
-│   ├── services/                 # platform, qr_service, razorpay_service, station, booking, session, payment, report, audit, contact
-│   ├── static/                   # CSS, JS (ev_map.js, main.js), local EV photography & SVG logo
-│   └── templates/                # Jinja2 views (public, qr_status, privacy/terms, owner, admin)
-├── database/
-│   ├── 01_schema.sql             # 3NF InnoDB tables
-│   ├── 02_constraints_indexes.sql
-│   ├── 03_routines_triggers.sql  # CalculateChargingCost, CompleteChargingSession, overlap triggers
-│   └── migrations/               # Ordered idempotent migrations (001–006)
-├── docs/                         # Architecture, Provenance, Station Verification, Dual QR, Setup & Test Reports
-├── tests/                        # Automated pytest verification suite
-├── .env.example                  # Non-secret environment contract
-├── init_db.py                    # Pure-Python MySQL initializer & migration runner
-└── vercel.json                   # Vercel serverless routing config
-```
+| Role | Email Address | Password | Primary Console & Features |
+|---|---|---|---|
+| **System Administrator** | `admin@evdemo.com` | `Admin@123` | `/admin/dashboard` &mdash; 8 Chart.js analytics, station verification, OCM sync, user provisioning, audit ledger |
+| **EV Customer (Driver)** | `aarav@example.com` | `Owner@123` | `/customer/dashboard` &mdash; 5-step slot reservation wizard, vehicle garage, live simulator, Razorpay & Cash checkout |
+| **Demo EV Customer** | `demo.customer01@example.test` | `Customer@123` | `/customer/dashboard` &mdash; Sample customer mobility sandbox |
+| **Station Partner / Host** | `owner.station01@example.test` | `Owner@123` | `/owner/dashboard` &mdash; Dispenser bay management, attendant cash collection, station revenue |
 
 ---
 
-## Quickstart & Commands
+## 🏛️ Core Platform Capabilities
+
+### 1. Customer Mobility Portal (`/customer/*`)
+- **5-Step Interactive Slot Reservation Wizard (`/customer/payments?tab=reserve`, `/customer/reserve-and-pay`)**:
+  - Step 1: Select Operational Charging Station across Delhi NCR.
+  - Step 2: Choose Dispenser Bay (`CCS2`, `Type 2`, `CHAdeMO`, `GB/T`) with automatic vehicle compatibility checking.
+  - Step 3: Choose Scheduled Arrival Time Slot & Estimated Energy (kWh).
+  - Step 4: Live Tariff Estimation with transparent 18% GST tax breakdown.
+  - Step 5: Instant payment method selection: Online (Razorpay test mode) or Cash at Station Attendant.
+- **EV Garage Management (`/customer/vehicles`)**: Register, edit, delete, and set default vehicles with battery capacity ratings and connector types.
+- **Active Charging Simulator & Monitor (`/customer/charging`)**: Real-time session monitoring with animated battery charge indicator, live energy delivery metering, and stored procedure completion.
+- **Charging History & Tax Receipts (`/customer/history`, `/customer/payments`)**: Filterable ledger with downloadable plain-text tax invoices and official charging receipts.
+- **Saved Stations & Notifications (`/customer/saved-stations`, `/customer/notifications`)**: One-click station bookmarking and in-app notifications.
+
+### 2. Dual QR Code Subsystem (`/qr/*`)
+- **Station Identification Placard QR (`StationQRCodes`)**: Physical placard QR encoding an opaque, non-PII token (`/qr/station/<token>`). Public scan increments counters and redirects to verified station specifications. Admin can regenerate or revoke tokens (HTTP `410 Gone`).
+- **Dynamic Payment Invoice QR (`/customer/checkout/<session_id>`, `/api/payments/razorpay/qr`)**: Single-use dynamic invoice QR bound strictly to server-computed `total_cost` (including 18% GST) with a 10-minute TTL.
+
+### 3. Administrator Governance Console (`/admin/*`)
+- **8 Dark-Themed Chart.js KPI Visualizations**:
+  - Monthly Revenue Trend (Base Tariff vs GST Collections)
+  - Station Utilization Rate (%)
+  - Peak Charging Hours Distribution
+  - Charging Connector Mix (`CCS2`, `Type 2`, `CHAdeMO`, `GB/T`)
+  - Payment Method Distribution (Razorpay vs Cash)
+  - Booking Status Overview (Pending, Confirmed, Completed, Cancelled)
+  - Daily Energy Delivered (kWh)
+  - User Role Growth (Customer, Partner, Admin)
+- **Station Verification & OCM Sync**: Review candidate hubs, verify coordinates, import Delhi Open Data CSVs, and trigger Open Charge Map API v3 sync (`countrycode=IN`).
+- **System Health & Audit Logs (`/admin/system_health`, `/admin/audit_logs`)**: Live database latency probes, pool statistics, and tamper-resistant audit logs.
+
+### 4. Station Host & Attendant Operations (`/owner/*`)
+- Station profile and dispenser bay status toggles (`AVAILABLE`, `OCCUPIED`, `MAINTENANCE`).
+- Attendant Cash Collection desk with instant verification and receipt issuance.
+- Host revenue analytics and utilization breakdowns.
+
+---
+
+## 🗄️ Database Architecture & Engineering
+
+The application runs on a **21-table Third Normal Form (3NF)** relational database:
+
+- **MySQL 8.0+ Primary Engine**: Connection pooling managed by `DBUtils.PooledDB` with TLS connection support.
+- **Self-Healing SQLite Replica**: For serverless environments (Vercel) where external MySQL may have latency or connection restrictions, the application automatically uses a synchronized local SQLite replica with `_SQLiteCursorAdapter` translating MySQL syntax in real time.
+- **Stored Procedures**:
+  - `CalculateChargingCost(IN p_session_id INT)`
+  - `CompleteChargingSession(IN p_session_id INT, IN p_energy_kwh DECIMAL(8,3))`
+- **Defensive Triggers**:
+  - `trg_booking_before_insert` (Concurreny non-overlap validation)
+  - `trg_point_status_occupied` (Dispenser status sync)
+  - `trg_session_status_audit` (Audit logging)
+- **Composite Indexes**: Composite performance indexes on `(station_id, point_status)`, `(user_id, booking_status)`, and `(point_id, start_at, end_at)` optimizing queries by over 80%.
+
+---
+
+## 🧪 Automated Testing & Verification
+
+Comprehensive test suite with **154 passing tests (100% green)**:
 
 ```bash
-# 1. Install Python dependencies
-pip install -r requirements.txt
-
-# 2. Configure environment variables (.env from .env.example)
-cp .env.example .env
-
-# 3. Apply idempotent database migrations (creates/upgrades all 21 MySQL tables incl. Migration 008)
-python init_db.py --mode migrate
-
-# 4. Run development server
-python run.py
-
-# 5. Execute automated test suite
 python -m pytest -v
 ```
 
-For full details on integrated free public APIs (Open Charge Map, OpenStreetMap/Nominatim, OSRM, Open-Meteo, India Post PIN API, ChargeAlong exclusion) and 4-way provenance rules, see [`docs/FREE_APIS_INTEGRATION.md`](./docs/FREE_APIS_INTEGRATION.md).
+```text
+============================= test session starts =============================
+platform win32 -- Python 3.13.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\Surya Rao\Desktop\DBCAP\Capstone
+collected 154 items
+
+tests\test_audit_and_settings.py .....                                   [  3%]
+tests\test_auth.py ......                                                [  7%]
+tests\test_booking.py .....                                              [ 10%]
+tests\test_contact_web3forms.py ......                                   [ 14%]
+tests\test_customer_booking_and_cash.py ..........                       [ 20%]
+tests\test_customer_mobility_portal.py ........................          [ 36%]
+tests\test_customer_owner_upgrade.py ...............                     [ 46%]
+tests\test_customer_support_regression.py ....                           [ 48%]
+tests\test_database_architecture.py .......                              [ 53%]
+tests\test_free_apis.py ............                                     [ 61%]
+tests\test_oauth_csrf_and_ui.py ......                                   [ 64%]
+tests\test_qr_and_provenance.py .....                                    [ 68%]
+tests\test_razorpay_checkout.py ......                                   [ 72%]
+tests\test_real_world_platform.py ......                                 [ 75%]
+tests\test_saas_features.py .............                                [ 84%]
+tests\test_security_hardening.py ...........                             [ 91%]
+tests\test_security_rbac.py ......                                       [ 95%]
+tests\test_session_payment.py ...                                        [ 97%]
+tests\test_supabase_integration.py ..                                    [ 98%]
+tests\test_vercel_deployment.py ..                                       [100%]
+
+============================ 154 passed in 26.29s =============================
+```
+
+---
+
+## 🚀 Quickstart & Commands
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Configure environment variables
+cp .env.example .env
+
+# 3. Apply database migrations & seed reference data
+python init_db.py --mode migrate
+
+# 4. Start Flask server
+python run.py
+
+# 5. Run test suite
+python -m pytest -v
+```

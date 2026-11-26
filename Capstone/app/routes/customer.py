@@ -761,12 +761,12 @@ def payment_result(payment_id):
     uid = get_current_user_id()
     payment = query_one(
         "SELECT p.*, "
-        "       COALESCE(cs.energy_kwh, 0) AS energy_consumed_kwh, "
-        "       COALESCE(cs.energy_kwh, 0) AS energy_kwh, "
-        "       COALESCE(cs.start_at, p.created_at) AS start_time, "
-        "       COALESCE(cs.start_at, p.created_at) AS start_at, "
-        "       COALESCE(cs.end_at, p.paid_at) AS end_time, "
-        "       COALESCE(cs.end_at, p.paid_at) AS end_at, "
+        "       COALESCE(cs.energy_kwh, b.estimated_energy_kwh, 0) AS energy_consumed_kwh, "
+        "       COALESCE(cs.energy_kwh, b.estimated_energy_kwh, 0) AS energy_kwh, "
+        "       COALESCE(cs.start_at, b.start_at, p.created_at) AS start_time, "
+        "       COALESCE(cs.start_at, b.start_at, p.created_at) AS start_at, "
+        "       COALESCE(cs.end_at, b.end_at, p.paid_at) AS end_time, "
+        "       COALESCE(cs.end_at, b.end_at, p.paid_at) AS end_at, "
         "       COALESCE(s.station_name, s2.station_name, 'EZ Charge Hub') AS station_name, "
         "       COALESCE(s.city, s2.city, '') AS city, "
         "       COALESCE(s.address, s2.address, '') AS address, "
@@ -806,9 +806,9 @@ def payment_receipt_text(payment_id):
 
     payment = query_one(
         "SELECT p.*, "
-        "       COALESCE(cs.energy_kwh, 0) AS energy_kwh, "
-        "       COALESCE(cs.start_at, p.created_at) AS start_at, "
-        "       COALESCE(cs.end_at, p.paid_at) AS end_at, "
+        "       COALESCE(cs.energy_kwh, b.estimated_energy_kwh, 0) AS energy_kwh, "
+        "       COALESCE(cs.start_at, b.start_at, p.created_at) AS start_at, "
+        "       COALESCE(cs.end_at, b.end_at, p.paid_at) AS end_at, "
         "       COALESCE(s.station_name, s2.station_name, 'EZ Charge Hub') AS station_name, "
         "       COALESCE(s.city, s2.city, '') AS city, "
         "       COALESCE(s.address, s2.address, '') AS address, "
@@ -832,12 +832,14 @@ def payment_receipt_text(payment_id):
     if not payment:
         abort(403)
 
+    ref_desc = f"Slot Reservation #{payment['booking_id']}" if payment.get("booking_id") else f"Charging Session #{payment.get('session_id', 'N/A')}"
     text_receipt = (
         "============================================================\n"
         "        EZ CHARGE NETWORK — TAX INVOICE & CHARGE RECEIPT   \n"
         "============================================================\n"
         f"Invoice / Payment ID : #{payment['payment_id']}\n"
         f"Transaction Ref      : {payment.get('transaction_reference', 'N/A')}\n"
+        f"Reference            : {ref_desc}\n"
         f"Gateway Provider     : {payment.get('gateway_provider', 'RAZORPAY_TEST')}\n"
         f"Station Name         : {payment.get('station_name')}\n"
         f"Location             : {payment.get('city')}, {payment.get('address')}\n"

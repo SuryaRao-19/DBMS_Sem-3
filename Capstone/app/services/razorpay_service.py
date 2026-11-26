@@ -67,13 +67,13 @@ def compute_tax_breakdown(total_cost):
     """Split GST-inclusive session total (18% GST) accurately in INR without altering ledger sum."""
     total = round(Decimal(str(total_cost or 0)), 2)
     if total <= 0:
-        return {"base_amount": Decimal("0.00"), "tax_amount": Decimal("0.00"), "total_amount": Decimal("0.00"), "amount_paise": 0}
+        return {"base_amount": 0.00, "tax_amount": 0.00, "total_amount": 0.00, "amount_paise": 0}
     base = round(total / Decimal("1.18"), 2)
     tax = round(total - base, 2)
     return {
-        "base_amount": base,
-        "tax_amount": tax,
-        "total_amount": total,
+        "base_amount": float(base),
+        "tax_amount": float(tax),
+        "total_amount": float(total),
         "amount_paise": int(round(float(total) * 100)),
     }
 
@@ -268,9 +268,9 @@ def create_razorpay_order(session_id=None, user_id=None, payment_method="UPI", b
                     target_booking_id,
                     tx_ref,
                     order_id,
-                    breakdown["total_amount"],
-                    breakdown["base_amount"],
-                    breakdown["tax_amount"],
+                    float(breakdown["total_amount"]),
+                    float(breakdown["base_amount"]),
+                    float(breakdown["tax_amount"]),
                     method,
                     "RAZORPAY TEST MODE CHECKOUT — NO REAL MONEY CHARGED",
                 ),
@@ -340,10 +340,11 @@ def create_dynamic_payment_qr(session_id=None, user_id=None, payment_method="UPI
                     "usage": "single_use",
                     "fixed_amount": True,
                     "payment_amount": order["amount_paise"],
-                    "description": f"EV Session #{session_id} (TEST MODE)",
+                    "description": f"EV {'Session #' + str(session_id) if session_id else 'Booking #' + str(booking_id)} (TEST MODE)",
                     "close_by": close_by_ts,
                     "notes": {
-                        "session_id": str(session_id),
+                        "session_id": str(session_id or ""),
+                        "booking_id": str(booking_id or ""),
                         "razorpay_order_id": order["order_id"],
                         "mode": "ACADEMIC_TEST_MODE",
                     },
@@ -364,7 +365,7 @@ def create_dynamic_payment_qr(session_id=None, user_id=None, payment_method="UPI
         qr_payload = (
             f"upi://pay?pa=ezchargedemo@razorpaytest&pn=EZ%20Charge%20Test%20Mode"
             f"&tr={order['order_id']}&am={order['amount_inr']:.2f}&cu=INR"
-            f"&tn=TEST_MODE_SESSION_{session_id}"
+            f"&tn=TEST_MODE_{'SESSION_' + str(session_id) if session_id else 'BOOKING_' + str(booking_id)}"
         )
 
     qr_data_uri = _render_qr_data_uri(qr_payload)

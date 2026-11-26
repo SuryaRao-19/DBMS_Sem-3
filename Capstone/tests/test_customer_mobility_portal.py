@@ -403,6 +403,14 @@ def test_razorpay_verification_valid_signature_and_idempotency(customer_client, 
         booking_row = query_one("SELECT booking_status FROM Bookings WHERE booking_id = %s", (b_id,))
         assert booking_row["booking_status"] == "CONFIRMED"
 
+        # Step 1b: Verify payment-result page renders HTTP 200 without BuildError on booking payments
+        p_row = query_one("SELECT payment_id FROM Payments WHERE booking_id = %s", (b_id,))
+        res_receipt = customer_client.get(f"/customer/payment-result/{p_row['payment_id']}")
+        assert res_receipt.status_code == 200
+        assert b"Payment Successful!" in res_receipt.data
+        assert f"BK-{b_id}".encode("utf-8") in res_receipt.data
+        assert b"View My Bookings" in res_receipt.data
+
         # Step 2: Idempotency test — call verify again with the same payload
         res_repeat = customer_client.post(
             "/api/payments/razorpay/verify",

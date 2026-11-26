@@ -26,3 +26,6 @@ Capstone/.git_backup/
 # Temp & Scratch files
 scratch/
 Capstone/scratch/
+LABS.zip
+LABS/
+*.docx

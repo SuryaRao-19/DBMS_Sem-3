@@ -296,3 +296,71 @@ def test_admin_dashboard_charts_sidebar_and_static_ev_media(client, admin_client
     assert "chartMonthlyBookings" in dash_html
     assert "chartConnectorMix" in dash_html
     assert "chartPaymentStatus" in dash_html
+
+
+def test_razorpay_sqlite_fallback_and_decimal_safety(app):
+    """
+    Verify Razorpay order creation, Dynamic Payment QR generation, and settlement
+    work without any decimal.Decimal parameter binding or interface errors when
+    running on SQLite fallback (serverless/replica runtime).
+    """
+    import app.db as db
+    from app.services.razorpay_service import (
+        compute_tax_breakdown,
+        create_razorpay_order,
+        create_dynamic_payment_qr,
+        generate_sandbox_payment_proof,
+        verify_and_settle_razorpay_payment,
+    )
+
+    # 1. compute_tax_breakdown returns JSON-serializable floats, no raw Decimals
+    breakdown = compute_tax_breakdown(436.60)
+    assert isinstance(breakdown["base_amount"], float)
+    assert isinstance(breakdown["tax_amount"], float)
+    assert isinstance(breakdown["total_amount"], float)
+    assert isinstance(breakdown["amount_paise"], int)
+    assert breakdown["total_amount"] == 436.60
+
+    # 2. Force SQLite mode to simulate serverless or standalone replica
+    orig_state = db._MYSQL_UNAVAILABLE
+    db._MYSQL_UNAVAILABLE = True
+    try:
+        with app.app_context():
+            # Create a test booking reservation in SQLite
+            db.execute(
+                "INSERT INTO Bookings (booking_id, user_id, vehicle_id, point_id, start_at, end_at, estimated_energy_kwh, estimated_cost, booking_status) "
+                "VALUES (999503, 2, 1, 1, '2026-11-25 18:00:00', '2026-11-25 19:00:00', 20.0, 436.60, 'PENDING')"
+            )
+
+            # Create Razorpay order - must not crash with Decimal binding error
+            order, err = create_razorpay_order(booking_id=999503, user_id=2)
+            assert err is None, f"Order creation failed: {err}"
+            assert order is not None
+            assert order["order_id"].startswith("order_sim_")
+            assert order["amount_inr"] == 436.60
+
+            # Create Dynamic Payment QR - must generate valid data URI
+            qr_res, qr_err = create_dynamic_payment_qr(booking_id=999503, user_id=2)
+            assert qr_err is None, f"QR generation failed: {qr_err}"
+            assert qr_res is not None
+            assert qr_res["qr_image_data_uri"].startswith("data:image/png;base64,")
+
+            # Complete settlement in sandbox
+            pay_id, sig = generate_sandbox_payment_proof(order["order_id"])
+            settled, s_err = verify_and_settle_razorpay_payment(
+                booking_id=999503,
+                user_id=2,
+                razorpay_order_id=order["order_id"],
+                razorpay_payment_id=pay_id,
+                razorpay_signature=sig,
+            )
+            assert s_err is None, f"Settlement failed: {s_err}"
+            assert settled["payment_status"] == "SUCCESS"
+
+            # Verify booking status changed to CONFIRMED
+            b_row = db.query_one("SELECT booking_status FROM Bookings WHERE booking_id = 999503")
+            assert b_row["booking_status"] == "CONFIRMED"
+    finally:
+        db.execute("DELETE FROM Payments WHERE booking_id = 999503")
+        db.execute("DELETE FROM Bookings WHERE booking_id = 999503")
+        db._MYSQL_UNAVAILABLE = orig_state

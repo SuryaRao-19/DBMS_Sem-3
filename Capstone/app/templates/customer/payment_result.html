@@ -2,46 +2,74 @@
 {% block title %}Payment Confirmation — EZ Charge Network Portal{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width:560px; margin:2.5rem auto; text-align:center; padding:2.5rem 2rem;">
+<div class="card" style="max-width:580px; margin:2.5rem auto; text-align:center; padding:2.5rem 2rem;">
   <div style="width:64px; height:64px; border-radius:50%; background:rgba(16,185,129,0.15); color:#10B981; display:inline-flex; align-items:center; justify-content:center; font-size:2rem; margin-bottom:1.25rem;">
     ✓
   </div>
 
   <h2 style="margin:0 0 0.5rem 0; font-size:1.5rem;">Payment Successful!</h2>
   <p style="color:var(--text-dim); margin:0 0 1.5rem 0; font-size:0.9rem;">
-    Your charging session payment has been verified and settled in the demonstration ledger.
+    Your {% if payment.booking_id %}slot reservation{% else %}charging session{% endif %} payment has been verified and settled in the demonstration ledger.
   </p>
 
   <div style="padding:1.25rem; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--color-border); text-align:left; margin-bottom:1.5rem; font-size:0.88rem;">
     <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
       <span style="color:var(--text-dim);">Transaction Ref:</span>
-      <code style="color:var(--accent-cyan);">{{ payment.transaction_reference }}</code>
+      <code style="color:var(--accent-cyan); font-weight:700;">{{ payment.transaction_reference }}</code>
     </div>
+    {% if payment.booking_id %}
     <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-      <span style="color:var(--text-dim);">Amount Paid:</span>
-      <strong style="color:#10B981;">₹{{ "%.2f"|format(payment.amount) }}</strong>
+      <span style="color:var(--text-dim);">Booking Reference:</span>
+      <strong style="color:var(--accent-cyan);">BK-{{ payment.booking_id }}</strong>
+    </div>
+    {% elif payment.session_id %}
+    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+      <span style="color:var(--text-dim);">Session Reference:</span>
+      <strong style="color:var(--accent-cyan);">SES-{{ payment.session_id }}</strong>
+    </div>
+    {% endif %}
+    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+      <span style="color:var(--text-dim);">Amount Settled:</span>
+      <strong style="color:#10B981; font-size:1.05rem;">₹{{ "%.2f"|format(payment.amount or 0) }}</strong>
     </div>
     <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
       <span style="color:var(--text-dim);">Station:</span>
-      <span>{{ payment.station_name }} ({{ payment.city }})</span>
+      <span>{{ payment.station_name }}{% if payment.city %} ({{ payment.city }}){% endif %}</span>
     </div>
     <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
       <span style="color:var(--text-dim);">Dispenser:</span>
       <span>{{ payment.point_code }} &bull; {{ payment.connector_type }}</span>
     </div>
     <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-      <span style="color:var(--text-dim);">Energy Delivered:</span>
+      <span style="color:var(--text-dim);">{% if payment.booking_id %}Reserved Energy:{% else %}Energy Delivered:{% endif %}</span>
       <span>{{ "%.2f"|format(payment.energy_consumed_kwh or 0) }} kWh</span>
     </div>
     <div style="display:flex; justify-content:space-between;">
       <span style="color:var(--text-dim);">Timestamp:</span>
-      <span>{{ payment.payment_time }}</span>
+      <span>
+        {% if payment.paid_at %}
+          {{ payment.paid_at.strftime('%d %b %Y, %I:%M %p') if payment.paid_at.strftime is defined else payment.paid_at }}
+        {% elif payment.created_at %}
+          {{ payment.created_at.strftime('%d %b %Y, %I:%M %p') if payment.created_at.strftime is defined else payment.created_at }}
+        {% else %}
+          Just now
+        {% endif %}
+      </span>
     </div>
   </div>
 
   <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap;">
+    {% if payment.session_id %}
     <a href="{{ url_for('customer.session_detail', session_id=payment.session_id) }}" class="btn btn-primary btn-sm">
       View Detailed Invoice
+    </a>
+    {% elif payment.booking_id %}
+    <a href="{{ url_for('customer.bookings') }}" class="btn btn-primary btn-sm">
+      View My Bookings
+    </a>
+    {% endif %}
+    <a href="{{ url_for('customer.payment_receipt_text', payment_id=payment.payment_id) }}" class="btn btn-secondary btn-sm" target="_blank" style="display:inline-flex; align-items:center; gap:0.35rem;">
+      📄 Download Receipt
     </a>
     <a href="{{ url_for('customer.dashboard') }}" class="btn btn-secondary btn-sm">
       Return to Dashboard

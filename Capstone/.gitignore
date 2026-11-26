@@ -33,3 +33,4 @@ app/static/uploads/avatars/avatar_*.png
 *.swo
 .DS_Store
 Thumbs.db
+.git_backup/

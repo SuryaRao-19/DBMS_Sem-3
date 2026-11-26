@@ -298,7 +298,14 @@ async function executeCheckout() {
       }, 500);
     }
   } catch (err) {
-    setStatus(err.message, false);
+    if (err.message && err.message.toLowerCase().includes('already settled')) {
+      setStatus(`✓ ${err.message} Redirecting to your bookings...`, true);
+      setTimeout(() => {
+        window.location.href = '{{ url_for("customer.bookings") }}';
+      }, 1500);
+    } else {
+      setStatus(err.message, false);
+    }
     btn.disabled = false;
   }
 }
@@ -327,7 +334,14 @@ async function generateQr() {
     startQrCountdown(data.qr.ttl_seconds || 600);
     setStatus('Dynamic Payment QR generated. Scan with any UPI app.', true);
   } catch (e) {
-    setStatus(e.message || 'QR generation failed', false);
+    if (e.message && e.message.toLowerCase().includes('already settled')) {
+      setStatus(`✓ ${e.message} Redirecting to your bookings...`, true);
+      setTimeout(() => {
+        window.location.href = '{{ url_for("customer.bookings") }}';
+      }, 1500);
+    } else {
+      setStatus(e.message || 'QR generation failed', false);
+    }
   } finally {
     btn.disabled = false;
   }

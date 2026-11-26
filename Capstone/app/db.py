@@ -9,7 +9,8 @@ import sqlite3
 import shutil
 import tempfile
 import re
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 from contextlib import contextmanager
 from urllib.parse import urlparse, parse_qs, unquote
 
@@ -17,6 +18,13 @@ import pymysql
 import pymysql.cursors
 from dbutils.pooled_db import PooledDB
 from flask import current_app
+
+try:
+    sqlite3.register_adapter(Decimal, lambda d: float(d))
+    sqlite3.register_adapter(datetime, lambda dt: dt.strftime("%Y-%m-%d %H:%M:%S"))
+    sqlite3.register_adapter(date, lambda d: d.strftime("%Y-%m-%d"))
+except Exception:
+    pass
 
 _POOLS = {}
 _POOL_LOCK = threading.Lock()
@@ -166,6 +174,7 @@ def _get_sqlite_connection():
         con.row_factory = sqlite3.Row
 
         try:
+            sqlite3.register_adapter(Decimal, lambda d: float(d))
             sqlite3.register_adapter(datetime, lambda dt: dt.strftime("%Y-%m-%d %H:%M:%S"))
             from datetime import date
             sqlite3.register_adapter(date, lambda d: d.strftime("%Y-%m-%d"))
@@ -178,6 +187,7 @@ def _get_sqlite_connection():
         con.create_function("VERSION", 0, lambda: "8.0.36-MySQL-Replica")
         con.create_function("DATABASE", 0, lambda: "ev_charging_db")
         con.create_function("IF", 3, lambda cond, v1, v2: v1 if cond else v2)
+        con.create_function("LAST_INSERT_ID", 0, lambda: con.execute("SELECT last_insert_rowid()").fetchone()[0])
         con.create_function(
             "DATE_FORMAT", 2,
             lambda dt, fmt: datetime.fromisoformat(str(dt).replace(" ", "T")).strftime(
@@ -196,6 +206,17 @@ def _get_sqlite_connection():
         return _SQLITE_CONN
 
 
+def _adapt_params_for_sqlite(params):
+    """Ensure parameter sequences bound to sqlite3 do not contain unadapted Decimal or unsupported types."""
+    if not params:
+        return ()
+    if isinstance(params, (list, tuple)):
+        return tuple(float(p) if isinstance(p, Decimal) else p for p in params)
+    if isinstance(params, dict):
+        return {k: (float(v) if isinstance(v, Decimal) else v) for k, v in params.items()}
+    return params
+
+
 def _adapt_sql_for_sqlite(sql):
     """Translate MySQL queries to SQLite syntax."""
     cleaned = sql.replace("%%", "%")
@@ -203,6 +224,13 @@ def _adapt_sql_for_sqlite(sql):
     cleaned = re.sub(r"@@hostname\b", "'localhost'", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+FOR\s+UPDATE\b", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bTIMESTAMPDIFF\s*\(\s*([A-Za-z]+)\s*,", r"TIMESTAMPDIFF('\1',", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bLAST_INSERT_ID\(\)", "last_insert_rowid()", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bDATE_SUB\s*\(\s*NOW\(\)\s*,\s*INTERVAL\s*(\d+)\s*MINUTE\s*\)", r"datetime('now', '-\1 minutes')", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bDATE_SUB\s*\(\s*NOW\(\)\s*,\s*INTERVAL\s*(\d+)\s*DAY\s*\)", r"datetime('now', '-\1 days')", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bDATE_SUB\s*\(\s*NOW\(\)\s*,\s*INTERVAL\s*(\d+)\s*HOUR\s*\)", r"datetime('now', '-\1 hours')", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bDATE_ADD\s*\(\s*NOW\(\)\s*,\s*INTERVAL\s*(\d+)\s*MINUTE\s*\)", r"datetime('now', '+\1 minutes')", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bDATE_ADD\s*\(\s*NOW\(\)\s*,\s*INTERVAL\s*(\d+)\s*DAY\s*\)", r"datetime('now', '+\1 days')", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bDATE_ADD\s*\(\s*NOW\(\)\s*,\s*INTERVAL\s*(\d+)\s*HOUR\s*\)", r"datetime('now', '+\1 hours')", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\(NOW\(\)\s*-\s*INTERVAL\s*(\d+)\s*MINUTE\)", r"datetime('now', '-\1 minutes')", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\(NOW\(\)\s*-\s*INTERVAL\s*(\d+)\s*DAY\)", r"datetime('now', '-\1 days')", cleaned, flags=re.IGNORECASE)
     return cleaned
@@ -253,11 +281,13 @@ class _SQLiteCursorAdapter:
 
     def execute(self, sql, params=None):
         adapted = _adapt_sql_for_sqlite(sql)
-        return self._raw.execute(adapted, params or ())
+        clean_params = _adapt_params_for_sqlite(params)
+        return self._raw.execute(adapted, clean_params)
 
     def executemany(self, sql, seq_of_params):
         adapted = _adapt_sql_for_sqlite(sql)
-        return self._raw.executemany(adapted, seq_of_params)
+        clean_seq = [_adapt_params_for_sqlite(p) for p in (seq_of_params or ())]
+        return self._raw.executemany(adapted, clean_seq)
 
     def fetchone(self):
         row = self._raw.fetchone()
@@ -307,9 +337,10 @@ def _sqlite_query_all(sql, params=None):
         return [{"Variable_name": "status", "Value": "OK"}]
     con = _get_sqlite_connection()
     adapted = _adapt_sql_for_sqlite(sql)
+    clean_params = _adapt_params_for_sqlite(params)
     with _SQLITE_LOCK:
         cur = con.cursor()
-        cur.execute(adapted, params or ())
+        cur.execute(adapted, clean_params)
         return [_convert_sqlite_row(dict(r)) for r in cur.fetchall()]
 
 
@@ -325,9 +356,10 @@ def _sqlite_query_one(sql, params=None):
         return {"Variable_name": "status", "Value": "OK"}
     con = _get_sqlite_connection()
     adapted = _adapt_sql_for_sqlite(sql)
+    clean_params = _adapt_params_for_sqlite(params)
     with _SQLITE_LOCK:
         cur = con.cursor()
-        cur.execute(adapted, params or ())
+        cur.execute(adapted, clean_params)
         row = cur.fetchone()
         return _convert_sqlite_row(dict(row)) if row else None
 
@@ -335,9 +367,10 @@ def _sqlite_query_one(sql, params=None):
 def _sqlite_execute(sql, params=None):
     con = _get_sqlite_connection()
     adapted = _adapt_sql_for_sqlite(sql)
+    clean_params = _adapt_params_for_sqlite(params)
     with _SQLITE_LOCK:
         cur = con.cursor()
-        cur.execute(adapted, params or ())
+        cur.execute(adapted, clean_params)
         con.commit()
         return cur.lastrowid
 
